@@ -14,6 +14,7 @@ def test_users_table_has_expected_columns() -> None:
     assert set(users_table.columns.keys()) == {
         "id",
         "email",
+        "password_hash",
         "first_name",
         "last_name",
         "role",
