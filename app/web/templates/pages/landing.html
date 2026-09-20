@@ -1,148 +1,112 @@
 {% extends "base.html" %}
 
+{% macro account_actions() %}
+  {% if navigation.register %}
+    <a class="button button--primary" href="{{ navigation.register }}">Регистрация</a>
+  {% else %}
+    <span class="button button--primary is-disabled" aria-disabled="true">Регистрация <small>скоро</small></span>
+  {% endif %}
+  {% if navigation.login %}
+    <a class="button button--secondary" href="{{ navigation.login }}">Войти</a>
+  {% else %}
+    <span class="button button--secondary is-disabled" aria-disabled="true">Войти <small>скоро</small></span>
+  {% endif %}
+{% endmacro %}
+
 {% block title %}TutorFlow — пространство для учебного процесса{% endblock %}
 
 {% block styles %}
-  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=stage-1">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=stage-2b">
+{% endblock %}
+
+{% block head %}
+  <link rel="preload" as="image" href="{{ url_for('static', path='/images/augustin/augustin-neutral.png') }}">
 {% endblock %}
 
 {% block content %}
   <div class="landing-page">
     <header class="site-header">
-      <a class="wordmark" href="{{ url_for('landing') }}" aria-label="TutorFlow — главная">
-        TutorFlow
-      </a>
-
-      <nav class="auth-actions" aria-label="Доступ к аккаунту">
-        {% if navigation.login %}
-          <a class="auth-action auth-action--quiet" href="{{ navigation.login }}">Войти</a>
-        {% else %}
-          <span class="auth-action auth-action--quiet is-disabled" aria-disabled="true">
-            Войти <small>скоро</small>
-          </span>
-        {% endif %}
-
-        {% if navigation.register %}
-          <a class="auth-action auth-action--primary" href="{{ navigation.register }}">Регистрация</a>
-        {% else %}
-          <span class="auth-action auth-action--primary is-disabled" aria-disabled="true">
-            Регистрация <small>скоро</small>
-          </span>
-        {% endif %}
-      </nav>
+      <a class="wordmark" href="{{ url_for('landing') }}" aria-label="TutorFlow — главная">TutorFlow</a>
+      <nav class="auth-actions" aria-label="Доступ к аккаунту">{{ account_actions() }}</nav>
     </header>
 
     <main>
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero__lead">
-          <p class="eyebrow">Пространство для обучения</p>
-          <h1 id="hero-title">Учёба<br>обретает<br><em>форму.</em></h1>
-        </div>
+      <section class="story" aria-label="Знакомство с TutorFlow" data-story>
+        <div class="story-stage">
+          <div class="augustin-position">
+            <div
+              class="augustin-stage"
+              data-augustin-stage
+              data-emotion="neutral"
+              role="img"
+              aria-label="Маскот TutorFlow Августин"
+            >
+              {% for emotion in ['neutral', 'confused', 'thinking', 'happy', 'excited'] %}
+                <img
+                  class="augustin-state{% if emotion == 'neutral' %} is-active{% endif %}"
+                  data-emotion="{{ emotion }}"
+                  src="{{ url_for('static', path='/images/augustin/augustin-' ~ emotion ~ '.png') }}"
+                  width="1254"
+                  height="1254"
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  {% if emotion == 'neutral' %}fetchpriority="high"{% endif %}
+                >
+              {% endfor %}
+            </div>
+          </div>
 
-        <div class="hero__visual" aria-label="Место для маскота TutorFlow Августина">
-          <div class="augustin-stage">
-            <span>Augustin asset</span>
+          <div class="story-progress" aria-hidden="true">
+            <span>TF / AUGUSTIN</span>
+            <span class="story-progress__line"></span>
+            <span>01 — 04</span>
           </div>
         </div>
 
-        <div class="hero__aside">
-          <p class="hero__statement">
-            Спокойная и понятная среда для тех, кто учит, и тех, кто учится.
-          </p>
-          <p class="hero__note">TutorFlow формируется вокруг реального учебного процесса.</p>
-        </div>
+        <div class="story-chapters">
+          <section class="chapter hero" aria-labelledby="hero-title" data-chapter="neutral">
+            <div class="chapter-copy hero__lead">
+              <p class="eyebrow">Пространство для обучения</p>
+              <h1 id="hero-title">Учёба<br> обретает<br> <em>форму.</em></h1>
+              <p class="chapter-description">TutorFlow создаётся, чтобы собрать учебный процесс в понятную систему.</p>
+              <a class="scroll-cue" href="#problem">Пройдём этот путь вместе <span aria-hidden="true">↘</span></a>
+            </div>
+          </section>
 
-        <a class="scroll-cue" href="#principles">
-          <span>Познакомиться</span>
-          <span aria-hidden="true">↓</span>
-        </a>
-      </section>
+          <section class="chapter chapter--problem" id="problem" aria-labelledby="problem-title" data-chapter="confused">
+            <div class="chapter-copy">
+              <p class="eyebrow">01 / Знакомое чувство</p>
+              <h2 id="problem-title">Всё где-то.<br><em>А главное?</em></h2>
+              <p class="chapter-description">Когда всё в разных местах, легко потерять главное. И потратить силы на поиски.</p>
+            </div>
+          </section>
 
-      <section class="manifesto" id="principles" aria-labelledby="manifesto-title">
-        <p class="section-index">01 / Основа</p>
-        <h2 id="manifesto-title">
-          Всё необходимое для учебного процесса — <span>в одном месте.</span>
-        </h2>
-        <p class="manifesto__copy">
-          Не ещё один набор разрозненных инструментов, а цельная цифровая среда,
-          в которой внимание остаётся на обучении.
-        </p>
-      </section>
+          <section class="chapter chapter--thinking" aria-labelledby="thinking-title" data-chapter="thinking">
+            <div class="chapter-copy">
+              <p class="eyebrow">02 / Другая перспектива</p>
+              <h2 id="thinking-title">А если<br><em>собрать вместе?</em></h2>
+              <p class="chapter-description">Мы создаём TutorFlow как единое пространство для тех, кто учит, и тех, кто учится.</p>
+            </div>
+          </section>
 
-      <section class="story" aria-label="Принципы TutorFlow">
-        <article class="story-panel story-panel--structure">
-          <div class="story-panel__meta">
-            <span>02</span>
-            <span>Ясность</span>
-          </div>
-          <div class="story-panel__body">
-            <p class="story-panel__kicker">Меньше лишнего</p>
-            <h2>Понятная структура вместо хаоса.</h2>
-            <p>
-              Интерфейс должен помогать сосредоточиться: ясная иерархия,
-              предсказуемые действия и только нужный контекст.
-            </p>
-          </div>
-          <div class="story-panel__mark" aria-hidden="true">TF / 02</div>
-        </article>
+          <section class="chapter chapter--solution" aria-labelledby="solution-title" data-chapter="happy">
+            <div class="chapter-copy">
+              <p class="eyebrow">03 / Понятная основа</p>
+              <h2 id="solution-title">Меньше хаоса.<br><em>Больше ясности.</em></h2>
+              <p class="chapter-description">Наша идея проста: понятная структура, в которой внимание остаётся на обучении.</p>
+            </div>
+          </section>
 
-        <article class="story-panel story-panel--rhythm">
-          <div class="story-panel__meta">
-            <span>03</span>
-            <span>Ритм</span>
-          </div>
-          <div class="story-panel__body">
-            <p class="story-panel__kicker">Общий контекст</p>
-            <h2>Один ритм для обучения и преподавания.</h2>
-            <p>
-              TutorFlow задуман как общее пространство, где обе стороны видят
-              учебный процесс последовательно и без информационного шума.
-            </p>
-          </div>
-          <div class="story-panel__mark" aria-hidden="true">TF / 03</div>
-        </article>
-
-        <article class="story-panel story-panel--growth">
-          <div class="story-panel__meta">
-            <span>04</span>
-            <span>Развитие</span>
-          </div>
-          <div class="story-panel__body">
-            <p class="story-panel__kicker">Продуманная основа</p>
-            <h2>TutorFlow растёт вместе с вашим учебным процессом.</h2>
-            <p>
-              Платформа развивается постепенно — от прочного фундамента к новым
-              сценариям, когда они действительно нужны пользователям.
-            </p>
-          </div>
-          <div class="story-panel__mark" aria-hidden="true">TF / 04</div>
-        </article>
-      </section>
-
-      <section class="closing" aria-labelledby="closing-title">
-        <p class="section-index">Следующий шаг</p>
-        <h2 id="closing-title">Учебный процесс может быть проще.</h2>
-        <p class="closing__copy">
-          TutorFlow готовит пространство, в котором преподавателям и ученикам
-          будет легче двигаться в одном направлении.
-        </p>
-
-        <div class="closing__actions" aria-label="Будущие действия с аккаунтом">
-          {% if navigation.register %}
-            <a class="button button--primary" href="{{ navigation.register }}">Регистрация</a>
-          {% else %}
-            <span class="button button--primary is-disabled" aria-disabled="true">
-              Регистрация <small>скоро</small>
-            </span>
-          {% endif %}
-
-          {% if navigation.login %}
-            <a class="button button--secondary" href="{{ navigation.login }}">Войти</a>
-          {% else %}
-            <span class="button button--secondary is-disabled" aria-disabled="true">
-              Войти <small>скоро</small>
-            </span>
-          {% endif %}
+          <section class="chapter chapter--final" aria-labelledby="closing-title" data-chapter="excited">
+            <div class="chapter-copy">
+              <p class="eyebrow">04 / Продолжение следует</p>
+              <h2 id="closing-title">Всё только<br> <em>начинается.</em></h2>
+              <p class="chapter-description">TutorFlow постепенно обретает форму. Рады, что вы здесь с самого начала.</p>
+              <div class="closing__actions" aria-label="Будущие действия с аккаунтом">{{ account_actions() }}</div>
+              <a class="back-to-start" href="#hero-title">Вернуться к началу ↑</a>
+            </div>
+          </section>
         </div>
       </section>
     </main>
@@ -156,5 +120,7 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="{{ url_for('static', path='/js/landing.js') }}?v=stage-1" defer></script>
+  <script src="{{ url_for('static', path='/vendor/gsap/gsap.min.js') }}?v=3.15.0" defer></script>
+  <script src="{{ url_for('static', path='/vendor/gsap/ScrollTrigger.min.js') }}?v=3.15.0" defer></script>
+  <script src="{{ url_for('static', path='/js/landing.js') }}?v=stage-2b" defer></script>
 {% endblock %}
