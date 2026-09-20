@@ -12,6 +12,9 @@ def test_landing_page() -> None:
     assert "text/html" in response.headers["content-type"]
     assert "TutorFlow" in response.text
     assert "augustin-neutral.png" in response.text
+    assert "Мы собрали то, что обычно разбросано" in response.text
+    assert "Теперь это один маршрут." in response.text
+    assert "Прокрутите, чтобы узнать больше" in response.text
 
 
 def test_design_tokens_are_served() -> None:

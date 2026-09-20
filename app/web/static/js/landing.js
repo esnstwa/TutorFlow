@@ -14,9 +14,9 @@
 
   function initIdleAnimation(gsap, stage) {
     return gsap.to(stage, {
-      y: -5,
-      rotation: 0.5,
-      duration: 3,
+      y: -10,
+      rotation: 0.8,
+      duration: 2.8,
       ease: "sine.inOut",
       repeat: -1,
       yoyo: true,
@@ -54,6 +54,7 @@
     let idleStopped = false;
 
     gsap.set(copies.slice(1), { opacity: 0, y: 24 });
+    gsap.set(story.querySelector(".story-progress"), { opacity: 0 });
 
     const timeline = gsap.timeline({
       defaults: { ease: "power1.inOut" },
@@ -112,6 +113,7 @@
       { scaleX: 1, duration: 4, ease: "none" },
       0,
     );
+    timeline.to(story.querySelector(".story-progress"), { opacity: 1, duration: 0.2 }, 0.72);
 
     return () => {
       idle.kill();

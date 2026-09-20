@@ -13,10 +13,23 @@
   {% endif %}
 {% endmacro %}
 
+{% macro header_account_actions() %}
+  {% if navigation.login %}
+    <a class="button button--secondary" href="{{ navigation.login }}">Войти</a>
+  {% else %}
+    <span class="button button--secondary is-disabled" aria-disabled="true" title="Скоро">Войти<span class="visually-hidden"> — скоро</span></span>
+  {% endif %}
+  {% if navigation.register %}
+    <a class="button button--primary" href="{{ navigation.register }}">Зарегистрироваться</a>
+  {% else %}
+    <span class="button button--primary is-disabled" aria-disabled="true" title="Скоро">Зарегистрироваться<span class="visually-hidden"> — скоро</span></span>
+  {% endif %}
+{% endmacro %}
+
 {% block title %}TutorFlow — пространство для учебного процесса{% endblock %}
 
 {% block styles %}
-  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=stage-2b">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=hero-reference">
 {% endblock %}
 
 {% block head %}
@@ -26,8 +39,8 @@
 {% block content %}
   <div class="landing-page">
     <header class="site-header">
-      <a class="wordmark" href="{{ url_for('landing') }}" aria-label="TutorFlow — главная">TutorFlow</a>
-      <nav class="auth-actions" aria-label="Доступ к аккаунту">{{ account_actions() }}</nav>
+      <a class="wordmark" href="{{ url_for('landing') }}" aria-label="TutorFlow — главная"><span>Tutor</span><em>Flow</em></a>
+      <nav class="auth-actions" aria-label="Доступ к аккаунту">{{ header_account_actions() }}</nav>
     </header>
 
     <main>
@@ -62,15 +75,28 @@
             <span class="story-progress__line"></span>
             <span>01 — 04</span>
           </div>
+
+          <div class="hero-scroll-indicator" aria-hidden="true">
+            <span class="hero-scroll-indicator__mouse"><span></span></span>
+            <span>Прокрутите, чтобы узнать больше</span>
+            <span class="hero-scroll-indicator__line"></span>
+          </div>
         </div>
 
         <div class="story-chapters">
           <section class="chapter hero" aria-labelledby="hero-title" data-chapter="neutral">
-            <div class="chapter-copy hero__lead">
-              <p class="eyebrow">Пространство для обучения</p>
-              <h1 id="hero-title">Учёба<br> обретает<br> <em>форму.</em></h1>
-              <p class="chapter-description">TutorFlow создаётся, чтобы собрать учебный процесс в понятную систему.</p>
-              <a class="scroll-cue" href="#problem">Пройдём этот путь вместе <span aria-hidden="true">↘</span></a>
+            <div class="chapter-copy hero__composition">
+              <div class="hero__lead">
+                <h1 id="hero-title">Учёба<br>обретает<br><em>форму.</em></h1>
+                <p class="chapter-description">Мы собрали то, что обычно разбросано<br>между чатами, календарями и файлами</p>
+                <a class="scroll-cue" href="#problem">Посмотреть, как это работает <span aria-hidden="true">↘</span></a>
+              </div>
+
+              <div class="hero__aside">
+                <p class="hero__aside-title">Теперь это один маршрут.</p>
+                <p class="hero__aside-copy">От запланированного занятия<br>до готовой работы.</p>
+              </div>
+
             </div>
           </section>
 
@@ -122,5 +148,5 @@
 {% block scripts %}
   <script src="{{ url_for('static', path='/vendor/gsap/gsap.min.js') }}?v=3.15.0" defer></script>
   <script src="{{ url_for('static', path='/vendor/gsap/ScrollTrigger.min.js') }}?v=3.15.0" defer></script>
-  <script src="{{ url_for('static', path='/js/landing.js') }}?v=stage-2b" defer></script>
+  <script src="{{ url_for('static', path='/js/landing.js') }}?v=hero-reference" defer></script>
 {% endblock %}
