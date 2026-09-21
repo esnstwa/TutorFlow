@@ -1,18 +1,5 @@
 {% extends "base.html" %}
 
-{% macro account_actions() %}
-  {% if navigation.register %}
-    <a class="button button--primary" href="{{ navigation.register }}">Регистрация</a>
-  {% else %}
-    <span class="button button--primary is-disabled" aria-disabled="true">Регистрация <small>скоро</small></span>
-  {% endif %}
-  {% if navigation.login %}
-    <a class="button button--secondary" href="{{ navigation.login }}">Войти</a>
-  {% else %}
-    <span class="button button--secondary is-disabled" aria-disabled="true">Войти <small>скоро</small></span>
-  {% endif %}
-{% endmacro %}
-
 {% macro header_account_actions() %}
   {% if navigation.login %}
     <a class="button button--secondary" href="{{ navigation.login }}">Войти</a>
@@ -29,11 +16,11 @@
 {% block title %}TutorFlow — пространство для учебного процесса{% endblock %}
 
 {% block styles %}
-  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=hero-reference">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=feature-scene-v13">
 {% endblock %}
 
 {% block head %}
-  <link rel="preload" as="image" href="{{ url_for('static', path='/images/augustin/augustin-neutral.png') }}">
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/augustin/augustin-neutral.webp') }}">
 {% endblock %}
 
 {% block content %}
@@ -54,11 +41,11 @@
               role="img"
               aria-label="Маскот TutorFlow Августин"
             >
-              {% for emotion in ['neutral', 'confused', 'thinking', 'happy', 'excited'] %}
+              {% for emotion in ['neutral', 'confused', 'focused', 'excited', 'happy'] %}
                 <img
                   class="augustin-state{% if emotion == 'neutral' %} is-active{% endif %}"
                   data-emotion="{{ emotion }}"
-                  src="{{ url_for('static', path='/images/augustin/augustin-' ~ emotion ~ '.png') }}"
+                  src="{{ url_for('static', path='/images/augustin/augustin-' ~ emotion ~ '.webp') }}"
                   width="1254"
                   height="1254"
                   alt=""
@@ -70,10 +57,20 @@
             </div>
           </div>
 
-          <div class="story-progress" aria-hidden="true">
-            <span>TF / AUGUSTIN</span>
-            <span class="story-progress__line"></span>
-            <span>01 — 04</span>
+          <div class="feature-elements" aria-hidden="true">
+            <div class="feature-element-set feature-element-set--focused" data-feature-elements="focused">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="feature-element-set feature-element-set--action" data-feature-elements="excited">
+              <span></span>
+              <span></span>
+            </div>
+            <div class="feature-element-set feature-element-set--result" data-feature-elements="happy">
+              <span></span>
+              <span></span>
+            </div>
           </div>
 
           <div class="hero-scroll-indicator" aria-hidden="true">
@@ -100,37 +97,39 @@
             </div>
           </section>
 
-          <section class="chapter chapter--problem" id="problem" aria-labelledby="problem-title" data-chapter="confused">
+          <section class="chapter feature-step" id="problem" aria-labelledby="problem-title" data-chapter="confused">
             <div class="chapter-copy">
-              <p class="eyebrow">01 / Знакомое чувство</p>
-              <h2 id="problem-title">Всё где-то.<br><em>А главное?</em></h2>
+              <p class="feature-step__count">01 / 04</p>
+              <p class="feature-step__label">Знакомое чувство</p>
+              <h2 id="problem-title"><strong>Всё где-то.</strong><br><em>А главное?</em></h2>
               <p class="chapter-description">Когда всё в разных местах, легко потерять главное. И потратить силы на поиски.</p>
             </div>
           </section>
 
-          <section class="chapter chapter--thinking" aria-labelledby="thinking-title" data-chapter="thinking">
+          <section class="chapter feature-step" id="plan" aria-labelledby="focused-title" data-chapter="focused">
             <div class="chapter-copy">
-              <p class="eyebrow">02 / Другая перспектива</p>
-              <h2 id="thinking-title">А если<br><em>собрать вместе?</em></h2>
-              <p class="chapter-description">Мы создаём TutorFlow как единое пространство для тех, кто учит, и тех, кто учится.</p>
+              <p class="feature-step__count">02 / 04</p>
+              <p class="feature-step__label">Всё по плану</p>
+              <h2 id="focused-title"><strong>Не вспоминай.</strong><br><em>Просто посмотри.</em></h2>
+              <p class="chapter-description">Никаких поисков по чатам и календарям. Время, предмет и ближайшее занятие всегда находятся там, где их ожидаешь увидеть.</p>
             </div>
           </section>
 
-          <section class="chapter chapter--solution" aria-labelledby="solution-title" data-chapter="happy">
+          <section class="chapter feature-step" id="action" aria-labelledby="action-title" data-chapter="excited">
             <div class="chapter-copy">
-              <p class="eyebrow">03 / Понятная основа</p>
-              <h2 id="solution-title">Меньше хаоса.<br><em>Больше ясности.</em></h2>
-              <p class="chapter-description">Наша идея проста: понятная структура, в которой внимание остаётся на обучении.</p>
+              <p class="feature-step__count">03 / 04</p>
+              <p class="feature-step__label">Пора действовать</p>
+              <h2 id="action-title"><strong>Получил. Сделал.</strong><br><em>Отправил.</em></h2>
+              <p class="chapter-description">Задание, срок и материалы находятся рядом. Готовую работу можно прикрепить и отправить, не переходя в другой сервис.</p>
             </div>
           </section>
 
-          <section class="chapter chapter--final" aria-labelledby="closing-title" data-chapter="excited">
+          <section class="chapter feature-step" id="result" aria-labelledby="result-title" data-chapter="happy">
             <div class="chapter-copy">
-              <p class="eyebrow">04 / Продолжение следует</p>
-              <h2 id="closing-title">Всё только<br> <em>начинается.</em></h2>
-              <p class="chapter-description">TutorFlow постепенно обретает форму. Рады, что вы здесь с самого начала.</p>
-              <div class="closing__actions" aria-label="Будущие действия с аккаунтом">{{ account_actions() }}</div>
-              <a class="back-to-start" href="#hero-title">Вернуться к началу ↑</a>
+              <p class="feature-step__count">04 / 04</p>
+              <p class="feature-step__label">Результат рядом</p>
+              <h2 id="result-title"><strong>Комментарии</strong><br><em>там, где и работа.</em></h2>
+              <p class="chapter-description">Комментарии преподавателя появляются рядом с работой. Не нужно искать замечания среди сообщений и вспоминать, к какому заданию они относились.</p>
             </div>
           </section>
         </div>
@@ -148,5 +147,5 @@
 {% block scripts %}
   <script src="{{ url_for('static', path='/vendor/gsap/gsap.min.js') }}?v=3.15.0" defer></script>
   <script src="{{ url_for('static', path='/vendor/gsap/ScrollTrigger.min.js') }}?v=3.15.0" defer></script>
-  <script src="{{ url_for('static', path='/js/landing.js') }}?v=hero-reference" defer></script>
+  <script src="{{ url_for('static', path='/js/landing.js') }}?v=feature-scene-v13" defer></script>
 {% endblock %}

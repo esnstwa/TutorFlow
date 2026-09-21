@@ -23,38 +23,33 @@
     });
   }
 
-  function getPoses(mode) {
-    if (mode === "desktop") {
-      return [
-        { x: 0, y: 0, rotation: 0, scale: 1 },
-        { x: -0.31, y: 0.10, rotation: -7, scale: 0.94 },
-        { x: 0.19, y: -0.12, rotation: 5, scale: 0.97 },
-        { x: -0.27, y: 0.01, rotation: -2, scale: 1 },
-        { x: -0.07, y: -0.23, rotation: 3, scale: 0.90 },
-      ];
-    }
-
-    const amplitude = mode === "tablet" ? 0.07 : 0.025;
-    return [
-      { x: 0, y: 0, rotation: 0, scale: 1 },
-      { x: -amplitude, y: 0.015, rotation: -3, scale: 0.97 },
-      { x: amplitude, y: -0.02, rotation: 3, scale: 0.98 },
-      { x: -amplitude / 2, y: 0, rotation: -1, scale: 1 },
-      { x: 0, y: -0.02, rotation: 2, scale: 1.03 },
-    ];
-  }
-
-  function initStory({ gsap, story, stage, states, debugEmotion, mode }) {
+  function initStory({ gsap, story, stage, states, debugEmotion }) {
     story.classList.add("is-animated");
     const chapters = [...story.querySelectorAll("[data-chapter]")];
     const copies = chapters.map(chapter => chapter.querySelector(".chapter-copy"));
     const character = story.querySelector(".augustin-position");
-    const poses = getPoses(mode);
+    const featureElements = new Map(
+      [...story.querySelectorAll("[data-feature-elements]")]
+        .map(element => [element.dataset.featureElements, element]),
+    );
     const idle = initIdleAnimation(gsap, stage);
-    let idleStopped = false;
+    let scrollTween = null;
+    let isDisposed = false;
+
+    function syncIdleAtProgress(progress) {
+      if (isDisposed) return;
+      const storyPosition = progress * (chapters.length - 1);
+      const isStableState = Math.abs(storyPosition - Math.round(storyPosition)) < 0.01;
+
+      if (isStableState && !scrollTween) {
+        idle.resume();
+      } else {
+        idle.pause();
+      }
+    }
 
     gsap.set(copies.slice(1), { opacity: 0, y: 24 });
-    gsap.set(story.querySelector(".story-progress"), { opacity: 0 });
+    gsap.set([...featureElements.values()], { opacity: 0, y: 20, scale: 0.98 });
 
     const timeline = gsap.timeline({
       defaults: { ease: "power1.inOut" },
@@ -63,59 +58,186 @@
         trigger: story,
         start: "top top",
         end: "bottom bottom",
-        scrub: 0.65,
+        scrub: 0.06,
         invalidateOnRefresh: true,
         onUpdate(self) {
-          if (self.progress > 0 && !idleStopped) {
-            idleStopped = true;
-            idle.pause();
-            gsap.to(stage, { y: 0, rotation: 0, duration: 0.3, overwrite: true });
-          }
+          syncIdleAtProgress(self.progress);
         },
       },
     });
 
-    timeline.addLabel("hero", 0);
-    const labels = ["hero", "problem", "thinking", "solution", "final"];
+    const labels = ["hero", "problem", "focused", "action", "result"];
+    const timelineClock = { progress: 0 };
+    timeline.to(timelineClock, {
+      progress: 1,
+      duration: labels.length - 1,
+      ease: "none",
+    }, 0);
+    timeline.addLabel(labels[0], 0);
+
     chapters.slice(1).forEach((chapter, offset) => {
       const index = offset + 1;
-      const start = index - 0.82;
-      const pose = poses[index];
+      const start = index - 0.92;
+      const changeAt = start + 0.34;
+      const previousEmotion = chapters[index - 1].dataset.chapter;
+      const nextEmotion = chapter.dataset.chapter;
+      const previousElements = featureElements.get(previousEmotion);
+      const nextElements = featureElements.get(nextEmotion);
 
       timeline.addLabel(labels[index], index);
       timeline.to(character, {
-        x: () => pose.x * window.innerWidth,
-        y: () => pose.y * window.innerHeight,
-        rotation: pose.rotation,
-        scale: pose.scale,
-        duration: 0.66,
+        rotation: index * 360,
+        duration: 0.72,
+        ease: "sine.inOut",
       }, start);
-      timeline.to(copies[index - 1], { opacity: 0, y: -18, duration: 0.22 }, start);
-      timeline.to(copies[index], { opacity: 1, y: 0, duration: 0.3 }, index - 0.45);
+      timeline.to(copies[index - 1], { opacity: 0, y: -12, duration: 0.16 }, start);
+      timeline.to(copies[index], { opacity: 1, y: 0, duration: 0.18 }, changeAt);
+
+      if (previousElements) {
+        timeline.to(previousElements, { opacity: 0, y: -8, duration: 0.16 }, start);
+      }
+      if (nextElements) {
+        timeline.to(nextElements, { opacity: 1, y: 0, scale: 1, duration: 0.18 }, changeAt);
+      }
 
       if (!debugEmotion) {
-        timeline.to(states.get(chapters[index - 1].dataset.chapter), {
+        timeline.to(states.get(previousEmotion), {
           opacity: 0,
-          duration: 0.12,
+          duration: 0.14,
           ease: "none",
-        }, index - 0.50);
-        timeline.to(states.get(chapter.dataset.chapter), {
+        }, changeAt);
+        timeline.to(states.get(nextEmotion), {
           opacity: 1,
-          duration: 0.12,
+          duration: 0.14,
           ease: "none",
-        }, index - 0.50);
+        }, changeAt);
       }
     });
 
-    timeline.fromTo(
-      story.querySelector(".story-progress__line"),
-      { scaleX: 0 },
-      { scaleX: 1, duration: 4, ease: "none" },
-      0,
-    );
-    timeline.to(story.querySelector(".story-progress"), { opacity: 1, duration: 0.2 }, 0.72);
+    let requestedIndex = getStepIndex();
+    let wheelGestureActive = false;
+    let wheelGestureCaptured = false;
+    let wheelGestureDirection = 0;
+    let wheelGestureTimer = null;
+    let touchStartY = null;
+    let touchHandled = false;
+
+    function getStepIndex() {
+      const progress = timeline.scrollTrigger?.progress || 0;
+      return Math.round(progress * (chapters.length - 1));
+    }
+
+    function animateToStep(targetIndex) {
+      const trigger = timeline.scrollTrigger;
+      if (!trigger || isDisposed) return;
+      idle.pause();
+
+      const stepDistance = (trigger.end - trigger.start) / (chapters.length - 1);
+      const targetY = trigger.start + stepDistance * targetIndex;
+      const distanceInSteps = Math.abs(targetY - window.scrollY) / stepDistance;
+      const duration = Math.min(0.6, 0.42 + Math.max(0, distanceInSteps - 1) * 0.08);
+      const scrollPosition = { y: window.scrollY };
+
+      const previousTween = scrollTween;
+      scrollTween = null;
+      previousTween?.kill();
+
+      let tween = null;
+      tween = gsap.to(scrollPosition, {
+        y: targetY,
+        duration,
+        ease: "power2.inOut",
+        overwrite: true,
+        onUpdate: () => window.scrollTo(0, scrollPosition.y),
+        onComplete: () => {
+          if (scrollTween !== tween) return;
+          scrollTween = null;
+          syncIdleAtProgress(trigger.progress);
+        },
+        onInterrupt: () => {
+          if (scrollTween !== tween) return;
+          scrollTween = null;
+          syncIdleAtProgress(trigger.progress);
+        },
+      });
+      scrollTween = tween;
+    }
+
+    function requestStep(direction) {
+      const baseIndex = scrollTween ? requestedIndex : getStepIndex();
+      const nextIndex = Math.max(0, Math.min(chapters.length - 1, baseIndex + direction));
+      if (nextIndex === baseIndex) return false;
+
+      requestedIndex = nextIndex;
+      animateToStep(requestedIndex);
+      return true;
+    }
+
+    function isInsideStory() {
+      const trigger = timeline.scrollTrigger;
+      return trigger && window.scrollY >= trigger.start - 1 && window.scrollY <= trigger.end + 1;
+    }
+
+    function onWheel(event) {
+      if (!isInsideStory() || Math.abs(event.deltaY) < 2) return;
+      const direction = event.deltaY > 0 ? 1 : -1;
+      const isNewGesture = !wheelGestureActive || direction !== wheelGestureDirection;
+
+      window.clearTimeout(wheelGestureTimer);
+      wheelGestureTimer = window.setTimeout(() => {
+        wheelGestureActive = false;
+        wheelGestureCaptured = false;
+      }, 100);
+
+      if (!isNewGesture) {
+        if (wheelGestureCaptured) event.preventDefault();
+        return;
+      }
+
+      wheelGestureActive = true;
+      wheelGestureDirection = direction;
+      wheelGestureCaptured = requestStep(direction);
+      if (wheelGestureCaptured) event.preventDefault();
+    }
+
+    function onTouchStart(event) {
+      touchStartY = event.touches[0]?.clientY ?? null;
+      touchHandled = false;
+    }
+
+    function onTouchMove(event) {
+      if (!isInsideStory() || touchStartY === null || touchHandled) return;
+      const currentY = event.touches[0]?.clientY;
+      if (currentY === undefined) return;
+
+      const delta = touchStartY - currentY;
+      if (Math.abs(delta) < 12) return;
+      if (requestStep(delta > 0 ? 1 : -1)) {
+        touchHandled = true;
+        event.preventDefault();
+      }
+    }
+
+    function onTouchEnd() {
+      touchStartY = null;
+      touchHandled = false;
+    }
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
 
     return () => {
+      isDisposed = true;
+      window.clearTimeout(wheelGestureTimer);
+      const activeTween = scrollTween;
+      scrollTween = null;
+      activeTween?.kill();
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
       idle.kill();
       story.classList.remove("is-animated");
     };
@@ -142,23 +264,16 @@
 
     const media = gsap.matchMedia();
     media.add({
-      desktop: "(min-width: 1024px)",
-      tablet: "(min-width: 768px) and (max-width: 1023px)",
-      mobile: "(max-width: 767px)",
+      animated: "(min-height: 640px) and (prefers-reduced-motion: no-preference)",
       reduced: "(prefers-reduced-motion: reduce)",
       short: "(max-height: 639px)",
     }, context => {
-      if (context.conditions.reduced || context.conditions.short) {
+      if (!context.conditions.animated || context.conditions.reduced || context.conditions.short) {
         initReducedMotion(story, stage, states, debugEmotion);
         return undefined;
       }
 
-      const mode = context.conditions.desktop
-        ? "desktop"
-        : context.conditions.tablet
-          ? "tablet"
-          : "mobile";
-      return initStory({ gsap, story, stage, states, debugEmotion, mode });
+      return initStory({ gsap, story, stage, states, debugEmotion });
     });
 
     const refresh = () => ScrollTrigger.refresh();
