@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% macro header_account_actions() %}
+  {% if navigation.login %}
+    <a class="button button--secondary" href="{{ navigation.login }}">Войти</a>
+  {% else %}
+    <span class="button button--secondary is-disabled" aria-disabled="true" title="Скоро">Войти<span class="visually-hidden"> — скоро</span></span>
+  {% endif %}
+  {% if navigation.register %}
+    <a class="button button--primary" href="{{ navigation.register }}">Зарегистрироваться</a>
+  {% else %}
+    <span class="button button--primary is-disabled" aria-disabled="true" title="Скоро">Зарегистрироваться<span class="visually-hidden"> — скоро</span></span>
+  {% endif %}
+{% endmacro %}
+
+{% block title %}TutorFlow — пространство для учебного процесса{% endblock %}
+
+{% block styles %}
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=feature-scene-v13">
+{% endblock %}
+
+{% block head %}
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/augustin/augustin-neutral.webp') }}">
+{% endblock %}
+
+{% block content %}
+  <div class="landing-page">
+    <header class="site-header">
+      <a class="wordmark" href="{{ url_for('landing') }}" aria-label="TutorFlow — главная"><span>Tutor</span><em>Flow</em></a>
+      <nav class="auth-actions" aria-label="Доступ к аккаунту">{{ header_account_actions() }}</nav>
+    </header>
+
+    <main>
+      <section class="story" aria-label="Знакомство с TutorFlow" data-story>
+        <div class="story-stage">
+          <div class="augustin-position">
+            <div
+              class="augustin-stage"
+              data-augustin-stage
+              data-emotion="neutral"
+              role="img"
+              aria-label="Маскот TutorFlow Августин"
+            >
+              {% for emotion in ['neutral', 'confused', 'focused', 'excited', 'happy'] %}
+                <img
+                  class="augustin-state{% if emotion == 'neutral' %} is-active{% endif %}"
+                  data-emotion="{{ emotion }}"
+                  src="{{ url_for('static', path='/images/augustin/augustin-' ~ emotion ~ '.webp') }}"
+                  width="1254"
+                  height="1254"
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  {% if emotion == 'neutral' %}fetchpriority="high"{% endif %}
+                >
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="feature-elements" aria-hidden="true">
+            <div class="feature-element-set feature-element-set--focused" data-feature-elements="focused">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="feature-element-set feature-element-set--action" data-feature-elements="excited">
+              <span></span>
+              <span></span>
+            </div>
+            <div class="feature-element-set feature-element-set--result" data-feature-elements="happy">
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+
+          <div class="hero-scroll-indicator" aria-hidden="true">
+            <span class="hero-scroll-indicator__mouse"><span></span></span>
+            <span>Прокрутите, чтобы узнать больше</span>
+            <span class="hero-scroll-indicator__line"></span>
+          </div>
+        </div>
+
+        <div class="story-chapters">
+          <section class="chapter hero" aria-labelledby="hero-title" data-chapter="neutral">
+            <div class="chapter-copy hero__composition">
+              <div class="hero__lead">
+                <h1 id="hero-title">Учёба<br>обретает<br><em>форму.</em></h1>
+                <p class="chapter-description">Мы собрали то, что обычно разбросано<br>между чатами, календарями и файлами</p>
+                <a class="scroll-cue" href="#problem">Посмотреть, как это работает <span aria-hidden="true">↘</span></a>
+              </div>
+
+              <div class="hero__aside">
+                <p class="hero__aside-title">Теперь это один маршрут.</p>
+                <p class="hero__aside-copy">От запланированного занятия<br>до готовой работы.</p>
+              </div>
+
+            </div>
+          </section>
+
+          <section class="chapter feature-step" id="problem" aria-labelledby="problem-title" data-chapter="confused">
+            <div class="chapter-copy">
+              <p class="feature-step__count">01 / 04</p>
+              <p class="feature-step__label">Знакомое чувство</p>
+              <h2 id="problem-title"><strong>Всё где-то.</strong><br><em>А главное?</em></h2>
+              <p class="chapter-description">Когда всё в разных местах, легко потерять главное. И потратить силы на поиски.</p>
+            </div>
+          </section>
+
+          <section class="chapter feature-step" id="plan" aria-labelledby="focused-title" data-chapter="focused">
+            <div class="chapter-copy">
+              <p class="feature-step__count">02 / 04</p>
+              <p class="feature-step__label">Всё по плану</p>
+              <h2 id="focused-title"><strong>Не вспоминай.</strong><br><em>Просто посмотри.</em></h2>
+              <p class="chapter-description">Никаких поисков по чатам и календарям. Время, предмет и ближайшее занятие всегда находятся там, где их ожидаешь увидеть.</p>
+            </div>
+          </section>
+
+          <section class="chapter feature-step" id="action" aria-labelledby="action-title" data-chapter="excited">
+            <div class="chapter-copy">
+              <p class="feature-step__count">03 / 04</p>
+              <p class="feature-step__label">Пора действовать</p>
+              <h2 id="action-title"><strong>Получил. Сделал.</strong><br><em>Отправил.</em></h2>
+              <p class="chapter-description">Задание, срок и материалы находятся рядом. Готовую работу можно прикрепить и отправить, не переходя в другой сервис.</p>
+            </div>
+          </section>
+
+          <section class="chapter feature-step" id="result" aria-labelledby="result-title" data-chapter="happy">
+            <div class="chapter-copy">
+              <p class="feature-step__count">04 / 04</p>
+              <p class="feature-step__label">Результат рядом</p>
+              <h2 id="result-title"><strong>Комментарии</strong><br><em>там, где и работа.</em></h2>
+              <p class="chapter-description">Комментарии преподавателя появляются рядом с работой. Не нужно искать замечания среди сообщений и вспоминать, к какому заданию они относились.</p>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>TutorFlow</span>
+      <span>Преподавателям и ученикам</span>
+      <span>© 2026</span>
+    </footer>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='/vendor/gsap/gsap.min.js') }}?v=3.15.0" defer></script>
+  <script src="{{ url_for('static', path='/vendor/gsap/ScrollTrigger.min.js') }}?v=3.15.0" defer></script>
+  <script src="{{ url_for('static', path='/js/landing.js') }}?v=feature-scene-v13" defer></script>
+{% endblock %}
