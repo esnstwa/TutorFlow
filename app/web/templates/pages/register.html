@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Регистрация — TutorFlow{% endblock %}
+
+{% block styles %}
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/register.css') }}?v={{ static_version('css/register.css') }}">
+{% endblock %}
+
+{% block head %}
+  <link rel="preload" as="image" type="image/png" href="{{ url_for('static', path='/images/registration/teacher.png') }}">
+  <link rel="preload" as="image" type="image/png" href="{{ url_for('static', path='/images/registration/student.png') }}">
+{% endblock %}
+
+{% block content %}
+  <div class="register-page">
+    <header class="register-header">
+      <a class="register-wordmark" href="{{ url_for('landing') }}" aria-label="TutorFlow — главная">
+        <span>Tutor</span><em>Flow</em>
+      </a>
+    </header>
+
+    <main class="register-main">
+      <nav class="register-progress" aria-label="Прогресс регистрации">
+        <ol>
+          <li class="is-active" aria-current="step">
+            <span>1</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li>
+            <span>2</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li>
+            <span>3</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li>
+            <span>4</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li>
+            <span>5</span>
+            <svg class="register-progress__flag" viewBox="0 0 36 52" aria-hidden="true">
+              <path d="M7 48 14 7l17 8-19 9" />
+            </svg>
+          </li>
+        </ol>
+      </nav>
+
+      <section class="register-intro" aria-labelledby="register-title">
+        <p class="register-count"><strong>01</strong> / 05</p>
+        <h1 id="register-title">Давайте <em>знакомиться</em><span>.</span></h1>
+        <p class="register-lead">Для начала расскажите, как вы будете использовать TutorFlow.</p>
+      </section>
+
+      <form class="role-form" aria-label="Выбор роли">
+        <fieldset class="role-grid">
+          <legend class="visually-hidden">Как вы будете использовать TutorFlow?</legend>
+
+          <label class="role-card">
+            <input type="radio" name="role" value="teacher" checked>
+            <span class="role-card__surface">
+              <span class="role-card__indicator" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
+              </span>
+              <span class="role-card__image">
+                <img src="{{ url_for('static', path='/images/registration/teacher.png') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
+              </span>
+              <span class="role-card__title">Я преподаватель</span>
+              <span class="role-card__description">Планирую занятия, задания<br>и работу с учениками.</span>
+            </span>
+          </label>
+
+          <label class="role-card">
+            <input type="radio" name="role" value="student">
+            <span class="role-card__surface">
+              <span class="role-card__indicator" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
+              </span>
+              <span class="role-card__image">
+                <img src="{{ url_for('static', path='/images/registration/student.png') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
+              </span>
+              <span class="role-card__title">Я ученик</span>
+              <span class="role-card__description">Учусь, выполняю задания<br>и слежу за своим прогрессом.</span>
+            </span>
+          </label>
+        </fieldset>
+      </form>
+
+      <p class="register-login">
+        <span class="register-login__line" aria-hidden="true"></span>
+        <span>Уже есть аккаунт? <a href="{{ navigation.login }}">Войти</a></span>
+        <span class="register-login__line" aria-hidden="true"></span>
+      </p>
+    </main>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='/js/register.js') }}?v={{ static_version('js/register.js') }}" defer></script>
+{% endblock %}

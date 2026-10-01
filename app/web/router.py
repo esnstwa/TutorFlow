@@ -23,3 +23,12 @@ async def login(request: Request):
         name="pages/login.html",
         context={"navigation": get_auth_navigation(request)},
     )
+
+
+@router.get("/register", response_class=HTMLResponse, name="auth_register")
+async def register(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/register.html",
+        context={"navigation": get_auth_navigation(request)},
+    )
