@@ -15,6 +15,17 @@ def test_register_page() -> None:
     assert "01" in response.text
     assert "Я преподаватель" in response.text
     assert "Я ученик" in response.text
+    assert "Как к вам " in response.text
+    assert "<em>обращаться?</em>" in response.text
+    assert "Это имя будут видеть ваши ученики и преподаватели." in response.text
+    assert 'placeholder="Ваше имя"' in response.text
+    assert 'id="register-name-error"' in response.text
+    assert 'aria-describedby="register-name-error"' in response.text
+    assert 'class="name-form__success-icon"' in response.text
+    assert 'data-name-success-text' in response.text
+    assert "Продолжить" in response.text
+    assert 'class="name-form__submit-arrow"' in response.text
+    assert 'data-register-step="2" hidden' in response.text
     assert 'value="teacher" checked' in response.text
     assert "teacher.png" in response.text
     assert "student.png" in response.text

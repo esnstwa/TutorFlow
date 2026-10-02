@@ -4,6 +4,110 @@
   const cards = [...document.querySelectorAll(".role-card")];
   if (!cards.length) return;
 
+  const steps = [...document.querySelectorAll("[data-register-step]")];
+  const progressItems = [...document.querySelectorAll("[data-register-progress]")];
+  const nameForm = document.querySelector("[data-name-form]");
+  const nameInput = document.querySelector("#register-name");
+  const nameError = document.querySelector("[data-name-error]");
+  const nameSuccess = document.querySelector("[data-name-success]");
+  const nameSuccessText = document.querySelector("[data-name-success-text]");
+  const storageKey = "tutorflow.registration";
+  const invalidNameCharacterPattern = /[^А-Яа-яЁё-]/;
+  const invalidNameCharactersPattern = /[^А-Яа-яЁё-]/g;
+  const maximumNameLength = 30;
+  let registrationState = { role: "teacher", name: "", step: 1 };
+
+  try {
+    registrationState = { ...registrationState, ...JSON.parse(sessionStorage.getItem(storageKey) || "{}") };
+  } catch {
+    // Continue with defaults when session storage is unavailable or malformed.
+  }
+
+  function saveRegistrationState() {
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(registrationState));
+    } catch {
+      // Browser storage is an enhancement; the current registration still works without it.
+    }
+  }
+
+  function filterNameInput(value) {
+    const allowedCharacters = value.trim().replace(invalidNameCharactersPattern, "");
+    let filteredName = "";
+    let hasHyphen = false;
+
+    for (const character of allowedCharacters) {
+      if (character === "-") {
+        if (!filteredName || hasHyphen) continue;
+        hasHyphen = true;
+      }
+      filteredName += character;
+    }
+
+    return filteredName.slice(0, maximumNameLength);
+  }
+
+  function getNameValidationError(value) {
+    if (!value) return "Введите имя";
+    if (invalidNameCharacterPattern.test(value)) return "Используйте только русские буквы";
+    if (value.length < 2 || value.length > maximumNameLength) {
+      return "Имя должно содержать от 2 до 30 символов";
+    }
+
+    if (value.includes("-")) {
+      const parts = value.split("-");
+      if (parts.length !== 2 || parts.some(part => part.length < 2)) {
+        return "Дефис можно использовать только между частями имени";
+      }
+    }
+
+    return "";
+  }
+
+  function showNameError(message) {
+    nameError.textContent = message;
+    nameError.classList.add("is-visible");
+    nameError.setAttribute("aria-hidden", "false");
+    nameInput.setAttribute("aria-invalid", "true");
+  }
+
+  function clearNameError() {
+    nameError.textContent = "";
+    nameError.classList.remove("is-visible");
+    nameError.setAttribute("aria-hidden", "true");
+    nameInput.removeAttribute("aria-invalid");
+  }
+
+  function hideNameSuccess() {
+    nameSuccess.classList.remove("is-visible");
+    nameSuccess.setAttribute("aria-hidden", "true");
+  }
+
+  function showStep(step) {
+    registrationState.step = step;
+    saveRegistrationState();
+
+    steps.forEach(element => {
+      element.hidden = Number(element.dataset.registerStep) !== step;
+    });
+
+    progressItems.forEach(item => {
+      const itemStep = Number(item.dataset.registerProgress);
+      item.classList.toggle("is-complete", itemStep < step);
+      item.classList.toggle("is-active", itemStep === step);
+      if (itemStep === step) {
+        item.setAttribute("aria-current", "step");
+      } else {
+        item.removeAttribute("aria-current");
+      }
+    });
+
+    if (step === 2) {
+      history.replaceState(null, "", "#name");
+      nameInput?.focus({ preventScroll: true });
+    }
+  }
+
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const characterMotions = new Map();
   const settleTimers = new Map();
@@ -105,7 +209,85 @@
   }
 
   cards.forEach(card => {
-    card.querySelector('input[name="role"]')?.addEventListener("change", syncLevitation);
+    const input = card.querySelector('input[name="role"]');
+    input?.addEventListener("change", () => {
+      syncLevitation();
+      registrationState.role = input.value;
+      showStep(2);
+    });
+
+    card.addEventListener("click", () => {
+      if (!input?.checked) return;
+      registrationState.role = input.value;
+      showStep(2);
+    });
+  });
+
+  const savedRole = cards
+    .map(card => card.querySelector('input[name="role"]'))
+    .find(input => input?.value === registrationState.role);
+  if (savedRole) savedRole.checked = true;
+
+  if (nameInput && nameError && nameSuccess && nameSuccessText) {
+    registrationState.name = filterNameInput(String(registrationState.name || ""));
+    nameInput.value = registrationState.name;
+    saveRegistrationState();
+
+    nameInput.addEventListener("input", () => {
+      const enteredName = nameInput.value;
+      const cursorPosition = nameInput.selectionStart ?? nameInput.value.length;
+      const filteredCursorValue = filterNameInput(nameInput.value.slice(0, cursorPosition));
+      const filteredName = filterNameInput(nameInput.value);
+      const enteredHyphensCount = [...enteredName].filter(character => character === "-").length;
+      let inputError = "";
+
+      if (invalidNameCharacterPattern.test(enteredName)) {
+        inputError = "Используйте только русские буквы";
+      } else if (enteredName.length > maximumNameLength) {
+        inputError = "Имя должно содержать от 2 до 30 символов";
+      } else if (enteredName.startsWith("-") || enteredHyphensCount > 1) {
+        inputError = "Дефис можно использовать только между частями имени";
+      }
+
+      if (nameInput.value !== filteredName) {
+        nameInput.value = filteredName;
+        nameInput.setSelectionRange(filteredCursorValue.length, filteredCursorValue.length);
+      }
+
+      nameInput.setCustomValidity("");
+      if (inputError) {
+        showNameError(inputError);
+      } else {
+        clearNameError();
+      }
+      hideNameSuccess();
+      registrationState.name = filteredName;
+      saveRegistrationState();
+    });
+  }
+
+  nameForm?.addEventListener("submit", event => {
+    event.preventDefault();
+    const name = nameInput.value.trim();
+    const validationError = getNameValidationError(name);
+
+    if (validationError) {
+      nameInput.value = name;
+      hideNameSuccess();
+      nameInput.setCustomValidity("");
+      showNameError(validationError);
+      nameInput.focus();
+      return;
+    }
+
+    nameInput.setCustomValidity("");
+    nameInput.value = name;
+    registrationState.name = name;
+    saveRegistrationState();
+    clearNameError();
+    nameSuccessText.textContent = `Отлично, ${name}. Идём дальше.`;
+    nameSuccess.classList.add("is-visible");
+    nameSuccess.setAttribute("aria-hidden", "false");
   });
 
   reducedMotion.addEventListener("change", () => {
@@ -121,4 +303,5 @@
   }, { once: true });
 
   syncLevitation();
+  showStep(location.hash === "#name" || registrationState.step === 2 ? 2 : 1);
 })();

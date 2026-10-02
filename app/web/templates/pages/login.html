@@ -3,7 +3,7 @@
 {% block title %}Вход — TutorFlow{% endblock %}
 
 {% block styles %}
-  <link rel="stylesheet" href="{{ url_for('static', path='/css/login.css') }}?v=15">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/login.css') }}?v={{ static_version('css/login.css') }}">
 {% endblock %}
 
 {% block head %}
@@ -134,5 +134,5 @@
 
 {% block scripts %}
   <script src="{{ url_for('static', path='/vendor/gsap/gsap.min.js') }}?v=3.15.0" defer></script>
-  <script src="{{ url_for('static', path='/js/login.js') }}?v=6" defer></script>
+  <script src="{{ url_for('static', path='/js/login.js') }}?v={{ static_version('js/login.js') }}" defer></script>
 {% endblock %}

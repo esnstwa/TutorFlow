@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <title>{% block title %}TutorFlow{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/tokens.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/tokens.css') }}?v={{ static_version('css/tokens.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}?v={{ static_version('css/base.css') }}">
     {% block styles %}{% endblock %}
     {% block head %}{% endblock %}
   </head>

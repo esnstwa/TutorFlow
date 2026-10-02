@@ -16,7 +16,7 @@
 {% block title %}TutorFlow — пространство для учебного процесса{% endblock %}
 
 {% block styles %}
-  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v=feature-scene-v13">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/landing.css') }}?v={{ static_version('css/landing.css') }}">
 {% endblock %}
 
 {% block head %}
@@ -147,5 +147,5 @@
 {% block scripts %}
   <script src="{{ url_for('static', path='/vendor/gsap/gsap.min.js') }}?v=3.15.0" defer></script>
   <script src="{{ url_for('static', path='/vendor/gsap/ScrollTrigger.min.js') }}?v=3.15.0" defer></script>
-  <script src="{{ url_for('static', path='/js/landing.js') }}?v=feature-scene-v13" defer></script>
+  <script src="{{ url_for('static', path='/js/landing.js') }}?v={{ static_version('js/landing.js') }}" defer></script>
 {% endblock %}

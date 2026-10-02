@@ -118,6 +118,15 @@ body {
   color: #fff;
 }
 
+.register-progress li.is-complete > span {
+  background: var(--register-blue);
+  color: #fff;
+}
+
+.register-progress li.is-complete .register-progress__connector path {
+  stroke: var(--register-blue);
+}
+
 .register-progress__connector {
   position: absolute;
   z-index: 1;
@@ -160,6 +169,40 @@ body {
   margin-top: var(--register-flow-gap);
   flex: 0 0 auto;
   text-align: center;
+}
+
+.register-step {
+  display: contents;
+}
+
+.register-step[hidden] {
+  display: none;
+}
+
+.register-step--name {
+  display: flex;
+  width: 100%;
+  height: calc(clamp(21.25rem, 43vh, 23.75rem) + clamp(1.15rem, 3vh, 1.7rem) + 8rem);
+  margin-top: var(--register-flow-gap);
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
+.register-step--name[hidden] {
+  display: none;
+}
+
+.register-step--name__count,
+.register-step--name__heading {
+  margin-top: 0;
+}
+
+.register-step--name__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .register-count {
@@ -209,6 +252,93 @@ body {
   width: 100%;
   padding-top: clamp(1.15rem, 3vh, 1.7rem);
   flex: 0 0 auto;
+}
+
+.name-form {
+  --name-form-spacing: clamp(1.15rem, 3vh, 1.7rem);
+  display: flex;
+  width: 100%;
+  height: auto;
+  justify-content: center;
+  padding-top: var(--name-form-spacing);
+  flex: 0 0 auto;
+}
+
+.name-form__content {
+  width: min(100%, 31rem);
+}
+
+.name-form__error {
+  min-height: 1.25em;
+  margin: .35rem 0 0;
+  color: #c4314b;
+  font-size: .8rem;
+  line-height: 1.25;
+  opacity: 0;
+  text-align: left;
+  visibility: hidden;
+}
+
+.name-form__error.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.name-form .login-submit {
+  display: flex;
+  width: min(100%, 15rem);
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  margin: var(--name-form-spacing) auto 0;
+}
+
+.name-form__submit-arrow {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: translateX(0);
+  transition: transform 180ms ease;
+}
+
+.name-form .login-submit:hover .name-form__submit-arrow {
+  transform: translateX(.22rem);
+}
+
+.name-form__success {
+  display: flex;
+  min-height: 1.4em;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  margin: .95rem 0 0;
+  color: var(--register-muted);
+  font-size: clamp(.86rem, 1.2vw, .98rem);
+  line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 180ms ease;
+}
+
+.name-form__success-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: #ffad32;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.name-form__success.is-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .role-grid {
@@ -418,6 +548,10 @@ body {
   .role-grid {
     height: clamp(19.75rem, 43vh, 21.25rem);
   }
+
+  .register-step--name {
+    height: calc(clamp(19.75rem, 43vh, 21.25rem) + clamp(1.15rem, 3vh, 1.7rem) + 8rem);
+  }
 }
 
 @media (max-width: 700px) {
@@ -470,6 +604,18 @@ body {
 
   .role-form {
     padding-top: 1.5rem;
+  }
+
+  .register-step--name {
+    height: 29.5rem;
+  }
+
+  .name-form {
+    --name-form-spacing: 1.5rem;
+  }
+
+  .name-form__error {
+    min-height: 2.5em;
   }
 
   .role-grid {
