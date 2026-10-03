@@ -299,6 +299,31 @@ body {
   visibility: visible;
 }
 
+.email-form__field {
+  position: relative;
+}
+
+.email-form .login-field input {
+  padding-right: 3.2rem;
+}
+
+.email-form__valid-icon {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(.82);
+  transition: opacity 180ms ease, transform 180ms ease;
+  visibility: hidden;
+}
+
+.email-form__field.is-valid .email-form__valid-icon {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+  visibility: visible;
+}
+
 .register-continue {
   display: flex;
   width: min(100%, 15rem);
@@ -332,21 +357,6 @@ body {
   transform: translateX(.22rem);
 }
 
-.name-form__success {
-  display: flex;
-  min-height: 1.4em;
-  align-items: center;
-  justify-content: center;
-  gap: .4rem;
-  margin: .95rem 0 0;
-  color: var(--register-muted);
-  font-size: clamp(.86rem, 1.2vw, .98rem);
-  line-height: 1.4;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 180ms ease;
-}
-
 .name-form__success-icon {
   width: 1.35rem;
   height: 1.35rem;
@@ -356,11 +366,6 @@ body {
   stroke-width: 1.55;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.name-form__success.is-visible {
-  opacity: 1;
-  visibility: visible;
 }
 
 .role-grid {

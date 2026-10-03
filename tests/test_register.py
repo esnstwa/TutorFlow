@@ -21,11 +21,19 @@ def test_register_page() -> None:
     assert 'placeholder="Ваше имя"' in response.text
     assert 'id="register-name-error"' in response.text
     assert 'aria-describedby="register-name-error"' in response.text
-    assert 'class="name-form__success-icon"' in response.text
-    assert 'data-name-success-text' in response.text
+    assert 'data-name-success' not in response.text
+    assert 'data-name-success-text' not in response.text
     assert "Продолжить" in response.text
-    assert response.text.count('class="register-continue__arrow"') == 2
+    assert response.text.count('class="register-continue__arrow"') == 3
     assert 'data-register-step="2" hidden' in response.text
+    assert 'data-register-step="3" hidden' in response.text
+    assert "Теперь ваша " in response.text
+    assert "<em>почта.</em>" in response.text
+    assert "Она понадобится для входа и важных уведомлений TutorFlow." in response.text
+    assert 'aria-label="Email"' in response.text
+    assert 'placeholder="Ваша почта"' in response.text
+    assert 'id="register-email-error"' in response.text
+    assert 'aria-describedby="register-email-error"' in response.text
     assert 'value="teacher" checked' in response.text
     assert "teacher.png" in response.text
     assert "student.png" in response.text

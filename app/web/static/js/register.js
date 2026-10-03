@@ -10,13 +10,17 @@
   const nameForm = document.querySelector("[data-name-form]");
   const nameInput = document.querySelector("#register-name");
   const nameError = document.querySelector("[data-name-error]");
-  const nameSuccess = document.querySelector("[data-name-success]");
-  const nameSuccessText = document.querySelector("[data-name-success-text]");
+  const emailForm = document.querySelector("[data-email-form]");
+  const emailInput = document.querySelector("#register-email");
+  const emailError = document.querySelector("[data-email-error]");
+  const emailField = emailInput?.closest(".email-form__field");
   const storageKey = "tutorflow.registration";
   const invalidNameCharacterPattern = /[^А-Яа-яЁё-]/;
   const invalidNameCharactersPattern = /[^А-Яа-яЁё-]/g;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const maximumNameLength = 30;
-  let registrationState = { role: "teacher", name: "", step: 1 };
+  const maximumEmailLength = 254;
+  let registrationState = { role: "teacher", name: "", email: "", step: 1 };
 
   try {
     registrationState = { ...registrationState, ...JSON.parse(sessionStorage.getItem(storageKey) || "{}") };
@@ -79,9 +83,32 @@
     nameInput.removeAttribute("aria-invalid");
   }
 
-  function hideNameSuccess() {
-    nameSuccess.classList.remove("is-visible");
-    nameSuccess.setAttribute("aria-hidden", "true");
+  function getEmailValidationError(value) {
+    if (!value) return "Введите email";
+    if (value.length > maximumEmailLength || !emailPattern.test(value)) {
+      return "Введите корректный email";
+    }
+
+    return "";
+  }
+
+  function setEmailValidity(isValid) {
+    emailField?.classList.toggle("is-valid", isValid);
+  }
+
+  function showEmailError(message) {
+    emailError.textContent = message;
+    emailError.classList.add("is-visible");
+    emailError.setAttribute("aria-hidden", "false");
+    emailInput.setAttribute("aria-invalid", "true");
+    setEmailValidity(false);
+  }
+
+  function clearEmailError() {
+    emailError.textContent = "";
+    emailError.classList.remove("is-visible");
+    emailError.setAttribute("aria-hidden", "true");
+    emailInput.removeAttribute("aria-invalid");
   }
 
   function showStep(step) {
@@ -115,12 +142,17 @@
       }
     });
 
-    if (step === 2) {
-      history.replaceState(null, "", "#name");
-      nameInput?.focus({ preventScroll: true });
-    } else {
-      history.replaceState(null, "", `${location.pathname}${location.search}`);
-    }
+    const stepRoutes = new Map([
+      [1, `${location.pathname}${location.search}`],
+      [2, "#name"],
+      [3, "#email"],
+      [4, "#step-4"],
+      [5, "#step-5"],
+    ]);
+    history.replaceState(null, "", stepRoutes.get(step) || `${location.pathname}${location.search}`);
+
+    if (step === 2) nameInput?.focus({ preventScroll: true });
+    if (step === 3) emailInput?.focus({ preventScroll: true });
   }
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -263,7 +295,7 @@
     .find(input => input?.value === registrationState.role);
   if (savedRole) savedRole.checked = true;
 
-  if (nameInput && nameError && nameSuccess && nameSuccessText) {
+  if (nameInput && nameError) {
     registrationState.name = filterNameInput(String(registrationState.name || ""));
     nameInput.value = registrationState.name;
     saveRegistrationState();
@@ -295,7 +327,6 @@
       } else {
         clearNameError();
       }
-      hideNameSuccess();
       registrationState.name = filteredName;
       saveRegistrationState();
     });
@@ -308,7 +339,6 @@
 
     if (validationError) {
       nameInput.value = name;
-      hideNameSuccess();
       nameInput.setCustomValidity("");
       showNameError(validationError);
       nameInput.focus();
@@ -320,9 +350,60 @@
     registrationState.name = name;
     saveRegistrationState();
     clearNameError();
-    nameSuccessText.textContent = `Отлично, ${name}. Идём дальше.`;
-    nameSuccess.classList.add("is-visible");
-    nameSuccess.setAttribute("aria-hidden", "false");
+    showStep(3);
+  });
+
+  if (emailInput && emailError && emailField) {
+    registrationState.email = String(registrationState.email || "").trim();
+    emailInput.value = registrationState.email;
+    setEmailValidity(!getEmailValidationError(registrationState.email));
+    saveRegistrationState();
+
+    emailInput.addEventListener("input", () => {
+      emailInput.setCustomValidity("");
+      clearEmailError();
+      registrationState.email = emailInput.value;
+      setEmailValidity(!getEmailValidationError(emailInput.value.trim()));
+      saveRegistrationState();
+    });
+
+    emailInput.addEventListener("blur", () => {
+      const email = emailInput.value.trim();
+      if (!email) {
+        setEmailValidity(false);
+        return;
+      }
+
+      const validationError = getEmailValidationError(email);
+      if (validationError) {
+        showEmailError(validationError);
+      } else {
+        clearEmailError();
+        setEmailValidity(true);
+      }
+    });
+  }
+
+  emailForm?.addEventListener("submit", event => {
+    event.preventDefault();
+    const email = emailInput.value.trim();
+    const validationError = getEmailValidationError(email);
+
+    if (validationError) {
+      emailInput.value = email;
+      emailInput.setCustomValidity("");
+      showEmailError(validationError);
+      emailInput.focus();
+      return;
+    }
+
+    emailInput.setCustomValidity("");
+    emailInput.value = email;
+    registrationState.email = email;
+    saveRegistrationState();
+    clearEmailError();
+    setEmailValidity(true);
+    showStep(4);
   });
 
   reducedMotion.addEventListener("change", () => {
@@ -338,5 +419,14 @@
   }, { once: true });
 
   syncLevitation();
-  showStep(location.hash === "#name" || registrationState.step === 2 ? 2 : 1);
+  const hashSteps = new Map([
+    ["#name", 2],
+    ["#email", 3],
+    ["#step-4", 4],
+    ["#step-5", 5],
+  ]);
+  const storedStep = Number(registrationState.step);
+  const initialStep = hashSteps.get(location.hash)
+    || (Number.isInteger(storedStep) && storedStep >= 1 && storedStep <= 5 ? storedStep : 1);
+  showStep(initialStep);
 })();

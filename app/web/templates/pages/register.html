@@ -130,13 +130,50 @@
                   <path d="M5 12h14M14 7l5 5-5 5" />
                 </svg>
               </button>
-              <p class="name-form__success" data-name-success aria-live="polite" aria-hidden="true">
-                <svg class="name-form__success-icon" viewBox="0 0 32 32" aria-hidden="true">
-                  <path d="M8 1.5c0 4.6 1.9 6.5 6.5 6.5C9.9 8 8 9.9 8 14.5 8 9.9 6.1 8 1.5 8 6.1 8 8 6.1 8 1.5Z" />
-                  <path d="M21.5 9c0 8.1 3.4 11.5 11.5 11.5-8.1 0-11.5 3.4-11.5 11.5 0-8.1-3.4-11.5-11.5-11.5 8.1 0 11.5-3.4 11.5-11.5Z" />
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="register-step register-step--name register-step--email" data-register-step="3" hidden>
+        <section class="register-intro register-step--name__count" aria-label="Шаг регистрации">
+          <p class="register-count"><strong>03</strong> / 05</p>
+        </section>
+
+        <div class="register-step--name__body">
+          <section class="register-intro register-step--name__heading" aria-labelledby="register-email-title">
+            <h1 id="register-email-title">Теперь ваша <em>почта.</em></h1>
+            <p class="register-lead">Она понадобится для входа и важных уведомлений TutorFlow.</p>
+          </section>
+
+          <form class="name-form email-form" data-email-form aria-label="Электронная почта" novalidate>
+            <div class="name-form__content">
+              <div class="name-form__field email-form__field">
+                <div class="login-field">
+                  <input
+                    id="register-email"
+                    name="email"
+                    type="email"
+                    aria-label="Email"
+                    inputmode="email"
+                    autocomplete="email"
+                    maxlength="254"
+                    placeholder="Ваша почта"
+                    aria-describedby="register-email-error"
+                  >
+                  <svg class="email-form__valid-icon name-form__success-icon" viewBox="0 0 32 32" aria-hidden="true">
+                    <path d="M8 1.5c0 4.6 1.9 6.5 6.5 6.5C9.9 8 8 9.9 8 14.5 8 9.9 6.1 8 1.5 8 6.1 8 8 6.1 8 1.5Z" />
+                    <path d="M21.5 9c0 8.1 3.4 11.5 11.5 11.5-8.1 0-11.5 3.4-11.5 11.5 0-8.1-3.4-11.5-11.5-11.5 8.1 0 11.5-3.4 11.5-11.5Z" />
+                  </svg>
+                </div>
+                <p class="name-form__error" id="register-email-error" data-email-error aria-live="polite" aria-hidden="true"></p>
+              </div>
+              <button class="login-submit register-continue" type="submit">
+                <span>Продолжить</span>
+                <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h14M14 7l5 5-5 5" />
                 </svg>
-                <span data-name-success-text></span>
-              </p>
+              </button>
             </div>
           </form>
         </div>
