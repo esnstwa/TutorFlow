@@ -47,14 +47,13 @@ body {
 }
 
 .register-main {
-  display: flex;
+  display: grid;
   width: min(calc(100% - 3rem), 61.875rem);
   height: 100vh;
   height: 100svh;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   margin: 0 auto;
-  flex-direction: column;
-  justify-content: center;
-  padding: clamp(2.75rem, 6vh, 4rem) 0 calc(clamp(.85rem, 2vh, 1.25rem) - var(--register-login-optical-offset));
+  padding: clamp(5rem, 11vh, 6rem) 0 clamp(3rem, 7vh, 4rem);
 }
 
 .register-progress {
@@ -107,6 +106,7 @@ body {
   color: #667087;
   font-size: clamp(.78rem, 1.6vh, .9rem);
   font-weight: 450;
+  transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
 }
 
 .register-progress li.is-active > span {
@@ -121,6 +121,13 @@ body {
 .register-progress li.is-complete > span {
   background: var(--register-blue);
   color: #fff;
+  cursor: pointer;
+}
+
+.register-progress li.is-complete > span:hover,
+.register-progress li.is-complete > span:focus-visible {
+  background: #3154ff;
+  box-shadow: 0 0 0 .3rem rgba(24, 60, 255, .12);
 }
 
 .register-progress li.is-complete .register-progress__connector path {
@@ -171,8 +178,17 @@ body {
   text-align: center;
 }
 
+.register-workspace {
+  position: relative;
+  min-height: 0;
+}
+
 .register-step {
-  display: contents;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .register-step[hidden] {
@@ -181,11 +197,6 @@ body {
 
 .register-step--name {
   display: flex;
-  width: 100%;
-  height: calc(clamp(21.25rem, 43vh, 23.75rem) + clamp(1.15rem, 3vh, 1.7rem) + 8rem);
-  margin-top: var(--register-flow-gap);
-  flex: 0 0 auto;
-  flex-direction: column;
 }
 
 .register-step--name[hidden] {
@@ -200,7 +211,7 @@ body {
 .register-step--name__body {
   display: flex;
   min-height: 0;
-  flex: 1;
+  flex: 0 0 auto;
   flex-direction: column;
   justify-content: center;
 }
@@ -249,9 +260,13 @@ body {
 }
 
 .role-form {
-  width: 100%;
+  --role-card-height: clamp(19.5rem, 41vh, 21rem);
+  display: flex;
+  width: min(100%, 56rem);
+  margin-inline: auto;
   padding-top: clamp(1.15rem, 3vh, 1.7rem);
   flex: 0 0 auto;
+  flex-direction: column;
 }
 
 .name-form {
@@ -284,16 +299,23 @@ body {
   visibility: visible;
 }
 
-.name-form .login-submit {
+.register-continue {
   display: flex;
   width: min(100%, 15rem);
   align-items: center;
   justify-content: center;
   gap: .55rem;
+}
+
+.name-form .register-continue {
   margin: var(--name-form-spacing) auto 0;
 }
 
-.name-form__submit-arrow {
+.role-form .register-continue {
+  margin: clamp(.8rem, 1.8vh, 1rem) auto 0;
+}
+
+.register-continue__arrow {
   width: 1.2rem;
   height: 1.2rem;
   flex: 0 0 auto;
@@ -306,7 +328,7 @@ body {
   transition: transform 180ms ease;
 }
 
-.name-form .login-submit:hover .name-form__submit-arrow {
+.register-continue:hover .register-continue__arrow {
   transform: translateX(.22rem);
 }
 
@@ -344,9 +366,11 @@ body {
 .role-grid {
   display: grid;
   width: 100%;
-  height: clamp(21.25rem, 43vh, 23.75rem);
+  height: var(--role-card-height);
+  flex: 0 0 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1.25rem, 2.4vw, 1.875rem);
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(1rem, 1.8vw, 1.4rem);
   padding: 0;
   margin: 0;
   border: 0;
@@ -354,6 +378,7 @@ body {
 
 .role-card {
   display: block;
+  height: var(--role-card-height);
   min-width: 0;
   min-height: 0;
   cursor: pointer;
@@ -374,9 +399,10 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  max-height: 100%;
   grid-template-rows: minmax(0, 1fr) auto auto;
   align-items: center;
-  padding: clamp(.7rem, 1.6vh, 1rem) clamp(1.25rem, 2.5vw, 2rem) clamp(1.05rem, 2.2vh, 1.4rem);
+  padding: clamp(.6rem, 1.25vh, .8rem) clamp(1.05rem, 2vw, 1.6rem) clamp(.85rem, 1.7vh, 1.15rem);
   overflow: hidden;
   border: 2px solid var(--register-choice-border);
   border-radius: 1.35rem;
@@ -449,7 +475,7 @@ body {
 }
 
 .role-card__image img {
-  width: min(100%, 25rem);
+  width: min(94%, 22rem);
   height: 100%;
   min-height: 0;
   object-fit: contain;
@@ -541,17 +567,14 @@ body {
 
 @media (max-height: 760px) and (min-width: 701px) {
   .register-main {
-    padding-top: 2.5rem;
-    padding-bottom: calc(.75rem - var(--register-login-optical-offset));
+    padding-top: 4rem;
+    padding-bottom: 2rem;
   }
 
-  .role-grid {
-    height: clamp(19.75rem, 43vh, 21.25rem);
+  .role-form {
+    --role-card-height: clamp(18.5rem, 41vh, 19.75rem);
   }
 
-  .register-step--name {
-    height: calc(clamp(19.75rem, 43vh, 21.25rem) + clamp(1.15rem, 3vh, 1.7rem) + 8rem);
-  }
 }
 
 @media (max-width: 700px) {
@@ -606,8 +629,8 @@ body {
     padding-top: 1.5rem;
   }
 
-  .register-step--name {
-    height: 29.5rem;
+  .register-workspace {
+    height: calc(clamp(18rem, 82vw, 21.5rem) + clamp(18rem, 82vw, 21.5rem) + 14rem);
   }
 
   .name-form {
@@ -621,7 +644,12 @@ body {
   .role-grid {
     height: auto;
     grid-template-columns: 1fr;
+    grid-template-rows: none;
     gap: 1rem;
+  }
+
+  .role-card {
+    height: auto;
   }
 
   .role-card__surface {

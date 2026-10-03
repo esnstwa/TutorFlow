@@ -6,6 +6,7 @@
 
   const steps = [...document.querySelectorAll("[data-register-step]")];
   const progressItems = [...document.querySelectorAll("[data-register-progress]")];
+  const roleForm = document.querySelector(".role-form");
   const nameForm = document.querySelector("[data-name-form]");
   const nameInput = document.querySelector("#register-name");
   const nameError = document.querySelector("[data-name-error]");
@@ -93,18 +94,32 @@
 
     progressItems.forEach(item => {
       const itemStep = Number(item.dataset.registerProgress);
-      item.classList.toggle("is-complete", itemStep < step);
+      const isComplete = itemStep < step;
+      const node = item.querySelector(":scope > span");
+      item.classList.toggle("is-complete", isComplete);
       item.classList.toggle("is-active", itemStep === step);
       if (itemStep === step) {
         item.setAttribute("aria-current", "step");
       } else {
         item.removeAttribute("aria-current");
       }
+
+      if (isComplete) {
+        node?.setAttribute("role", "button");
+        node?.setAttribute("tabindex", "0");
+        node?.setAttribute("aria-label", `Вернуться к шагу ${itemStep}`);
+      } else {
+        node?.removeAttribute("role");
+        node?.removeAttribute("tabindex");
+        node?.removeAttribute("aria-label");
+      }
     });
 
     if (step === 2) {
       history.replaceState(null, "", "#name");
       nameInput?.focus({ preventScroll: true });
+    } else {
+      history.replaceState(null, "", `${location.pathname}${location.search}`);
     }
   }
 
@@ -213,13 +228,33 @@
     input?.addEventListener("change", () => {
       syncLevitation();
       registrationState.role = input.value;
-      showStep(2);
+      saveRegistrationState();
     });
+  });
 
-    card.addEventListener("click", () => {
-      if (!input?.checked) return;
-      registrationState.role = input.value;
-      showStep(2);
+  roleForm?.addEventListener("submit", event => {
+    event.preventDefault();
+    const selectedRole = roleForm.querySelector('input[name="role"]:checked');
+    if (!selectedRole) return;
+
+    registrationState.role = selectedRole.value;
+    saveRegistrationState();
+    showStep(2);
+  });
+
+  progressItems.forEach(item => {
+    const node = item.querySelector(":scope > span");
+    const returnToStep = () => {
+      const itemStep = Number(item.dataset.registerProgress);
+      if (itemStep >= registrationState.step) return;
+      showStep(itemStep);
+    };
+
+    node?.addEventListener("click", returnToStep);
+    node?.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      returnToStep();
     });
   });
 

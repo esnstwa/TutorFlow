@@ -48,6 +48,7 @@
         </ol>
       </nav>
 
+      <div class="register-workspace">
       <div class="register-step" data-register-step="1">
       <section class="register-intro" aria-labelledby="register-title">
         <p class="register-count"><strong>01</strong> / 05</p>
@@ -56,7 +57,7 @@
       </section>
 
       <form class="role-form" aria-label="Выбор роли">
-        <fieldset class="role-grid">
+          <fieldset class="role-grid">
           <legend class="visually-hidden">Как вы будете использовать TutorFlow?</legend>
 
           <label class="role-card">
@@ -85,9 +86,15 @@
               <span class="role-card__title">Я ученик</span>
               <span class="role-card__description">Учусь, выполняю задания<br>и слежу за своим прогрессом.</span>
             </span>
-          </label>
-        </fieldset>
-      </form>
+            </label>
+          </fieldset>
+          <button class="login-submit register-continue" type="submit">
+            <span>Продолжить</span>
+            <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14M14 7l5 5-5 5" />
+            </svg>
+          </button>
+        </form>
       </div>
 
       <div class="register-step register-step--name" data-register-step="2" hidden>
@@ -117,9 +124,9 @@
                 </div>
                 <p class="name-form__error" id="register-name-error" data-name-error aria-live="polite" aria-hidden="true"></p>
               </div>
-              <button class="login-submit" type="submit">
+              <button class="login-submit register-continue" type="submit">
                 <span>Продолжить</span>
-                <svg class="name-form__submit-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M5 12h14M14 7l5 5-5 5" />
                 </svg>
               </button>
@@ -133,6 +140,7 @@
             </div>
           </form>
         </div>
+      </div>
       </div>
 
       <p class="register-login">

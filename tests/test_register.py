@@ -24,7 +24,7 @@ def test_register_page() -> None:
     assert 'class="name-form__success-icon"' in response.text
     assert 'data-name-success-text' in response.text
     assert "Продолжить" in response.text
-    assert 'class="name-form__submit-arrow"' in response.text
+    assert response.text.count('class="register-continue__arrow"') == 2
     assert 'data-register-step="2" hidden' in response.text
     assert 'value="teacher" checked' in response.text
     assert "teacher.png" in response.text
