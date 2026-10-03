@@ -14,13 +14,34 @@
   const emailInput = document.querySelector("#register-email");
   const emailError = document.querySelector("[data-email-error]");
   const emailField = emailInput?.closest(".email-form__field");
+  const passwordForm = document.querySelector("[data-password-form]");
+  const passwordInput = document.querySelector("#register-password");
+  const passwordConfirmationInput = document.querySelector("#register-password-confirmation");
+  const passwordError = document.querySelector("[data-password-error]");
+  const passwordConfirmationError = document.querySelector("[data-password-confirmation-error]");
+  const passwordSubmit = passwordForm?.querySelector('button[type="submit"]');
+  const passwordRequirements = new Map(
+    [...document.querySelectorAll("[data-password-requirement]")].map(element => [
+      element.dataset.passwordRequirement,
+      element,
+    ]),
+  );
   const storageKey = "tutorflow.registration";
   const invalidNameCharacterPattern = /[^А-Яа-яЁё-]/;
   const invalidNameCharactersPattern = /[^А-Яа-яЁё-]/g;
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordLetterPattern = /\p{L}/u;
+  const passwordDigitPattern = /\d/;
   const maximumNameLength = 30;
   const maximumEmailLength = 254;
-  let registrationState = { role: "teacher", name: "", email: "", step: 1 };
+  let registrationState = {
+    role: "teacher",
+    name: "",
+    email: "",
+    password: "",
+    passwordConfirmation: "",
+    step: 1,
+  };
 
   try {
     registrationState = { ...registrationState, ...JSON.parse(sessionStorage.getItem(storageKey) || "{}") };
@@ -111,6 +132,73 @@
     emailInput.removeAttribute("aria-invalid");
   }
 
+  function getPasswordRequirements(value) {
+    return {
+      length: value.length >= 8,
+      letter: passwordLetterPattern.test(value),
+      digit: passwordDigitPattern.test(value),
+    };
+  }
+
+  function isPasswordValid(value) {
+    return Object.values(getPasswordRequirements(value)).every(Boolean);
+  }
+
+  function setPasswordFieldError(input, error, message) {
+    if (!input || !error) return;
+
+    error.textContent = message;
+    error.classList.toggle("is-visible", Boolean(message));
+    error.setAttribute("aria-hidden", String(!message));
+    if (message) {
+      input.setAttribute("aria-invalid", "true");
+    } else {
+      input.removeAttribute("aria-invalid");
+    }
+  }
+
+  function getPasswordConfirmationError(password, confirmation) {
+    return confirmation && confirmation !== password ? "Пароли не совпадают" : "";
+  }
+
+  function updatePasswordForm() {
+    if (!passwordInput || !passwordConfirmationInput || !passwordSubmit) return;
+
+    const password = passwordInput.value;
+    const confirmation = passwordConfirmationInput.value;
+    const requirements = getPasswordRequirements(password);
+
+    Object.entries(requirements).forEach(([name, isMet]) => {
+      passwordRequirements.get(name)?.classList.toggle("is-valid", isMet);
+    });
+
+    passwordSubmit.disabled = !(
+      password
+      && confirmation
+      && Object.values(requirements).every(Boolean)
+      && password === confirmation
+    );
+  }
+
+  function initPasswordToggles() {
+    document.querySelectorAll("[data-password-toggle]").forEach(toggle => {
+      const input = document.getElementById(toggle.getAttribute("aria-controls"));
+      if (!input) return;
+
+      const visibleIcon = toggle.querySelector("[data-icon-password-visible]");
+      const hiddenIcon = toggle.querySelector("[data-icon-password-hidden]");
+
+      toggle.addEventListener("click", () => {
+        const isVisible = input.type === "text";
+        input.type = isVisible ? "password" : "text";
+        toggle.setAttribute("aria-pressed", String(!isVisible));
+        toggle.setAttribute("aria-label", isVisible ? "Показать пароль" : "Скрыть пароль");
+        visibleIcon?.toggleAttribute("hidden", isVisible);
+        hiddenIcon?.toggleAttribute("hidden", !isVisible);
+      });
+    });
+  }
+
   function showStep(step) {
     registrationState.step = step;
     saveRegistrationState();
@@ -153,6 +241,7 @@
 
     if (step === 2) nameInput?.focus({ preventScroll: true });
     if (step === 3) emailInput?.focus({ preventScroll: true });
+    if (step === 4) passwordInput?.focus({ preventScroll: true });
   }
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -406,6 +495,76 @@
     showStep(4);
   });
 
+  if (passwordInput && passwordConfirmationInput && passwordError && passwordConfirmationError) {
+    passwordInput.value = String(registrationState.password || "");
+    passwordConfirmationInput.value = String(registrationState.passwordConfirmation || "");
+
+    passwordInput.addEventListener("input", () => {
+      registrationState.password = passwordInput.value;
+      setPasswordFieldError(passwordInput, passwordError, "");
+      if (passwordConfirmationInput.value) {
+        setPasswordFieldError(
+          passwordConfirmationInput,
+          passwordConfirmationError,
+          getPasswordConfirmationError(passwordInput.value, passwordConfirmationInput.value),
+        );
+      }
+      saveRegistrationState();
+      updatePasswordForm();
+    });
+
+    passwordConfirmationInput.addEventListener("input", () => {
+      registrationState.passwordConfirmation = passwordConfirmationInput.value;
+      setPasswordFieldError(
+        passwordConfirmationInput,
+        passwordConfirmationError,
+        passwordConfirmationInput.value
+          ? getPasswordConfirmationError(passwordInput.value, passwordConfirmationInput.value)
+          : "",
+      );
+      saveRegistrationState();
+      updatePasswordForm();
+    });
+
+    passwordInput.addEventListener("blur", () => {
+      setPasswordFieldError(passwordInput, passwordError, "");
+    });
+
+    passwordConfirmationInput.addEventListener("blur", () => {
+      setPasswordFieldError(
+        passwordConfirmationInput,
+        passwordConfirmationError,
+        getPasswordConfirmationError(passwordInput.value, passwordConfirmationInput.value),
+      );
+    });
+
+    updatePasswordForm();
+  }
+
+  passwordForm?.addEventListener("submit", event => {
+    event.preventDefault();
+    const password = passwordInput.value;
+    const confirmation = passwordConfirmationInput.value;
+    const confirmationValidationError = getPasswordConfirmationError(password, confirmation);
+
+    setPasswordFieldError(passwordInput, passwordError, "");
+    setPasswordFieldError(
+      passwordConfirmationInput,
+      passwordConfirmationError,
+      confirmationValidationError,
+    );
+
+    if (!isPasswordValid(password) || !confirmation || confirmationValidationError) {
+      (!isPasswordValid(password) ? passwordInput : passwordConfirmationInput).focus();
+      return;
+    }
+
+    registrationState.password = password;
+    registrationState.passwordConfirmation = confirmation;
+    saveRegistrationState();
+    showStep(5);
+  });
+
   reducedMotion.addEventListener("change", () => {
     if (reducedMotion.matches) {
       cards.forEach(card => resetImage(imageFor(card)));
@@ -418,6 +577,7 @@
     cards.forEach(card => resetImage(imageFor(card)));
   }, { once: true });
 
+  initPasswordToggles();
   syncLevitation();
   const hashSteps = new Map([
     ["#name", 2],

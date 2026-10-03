@@ -336,6 +336,84 @@ body {
   margin: var(--name-form-spacing) auto 0;
 }
 
+.password-form__fields {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: .2rem;
+}
+
+.password-form .name-form__field:last-child .name-form__error {
+  display: flex;
+  min-height: var(--name-form-spacing);
+  align-items: center;
+  margin: 0;
+}
+
+.password-requirements {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: clamp(1.7rem, 3.6vh, 2rem);
+  align-items: center;
+  justify-content: center;
+  gap: .7rem;
+  margin-top: 0;
+  color: #8b92a3;
+  font-size: clamp(.8rem, 1.15vw, .92rem);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.password-requirements > span:not(.password-requirements__separator) {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  transition: color 180ms ease;
+}
+
+.password-requirements .password-requirements__check {
+  position: static;
+  z-index: auto;
+  flex: 0 0 auto;
+  transform: scale(.82);
+}
+
+.password-requirements [data-password-requirement].is-valid {
+  color: var(--register-blue);
+}
+
+.password-requirements [data-password-requirement].is-valid .password-requirements__check {
+  border-color: var(--register-blue);
+  background: var(--register-blue);
+}
+
+.password-requirements [data-password-requirement].is-valid .password-requirements__check svg {
+  opacity: 1;
+}
+
+.password-requirements__separator {
+  color: #c5c9d2;
+}
+
+.register-continue:disabled {
+  border-color: #c9cfea;
+  background: #c9cfea;
+  box-shadow: none;
+  color: rgba(255, 255, 255, .9);
+  cursor: not-allowed;
+}
+
+.register-continue:disabled:hover,
+.register-continue:disabled:active {
+  box-shadow: none;
+}
+
+.register-continue:disabled .register-continue__arrow,
+.register-continue:disabled:hover .register-continue__arrow {
+  transform: none;
+}
+
 .role-form .register-continue {
   margin: clamp(.8rem, 1.8vh, 1rem) auto 0;
 }
@@ -644,6 +722,15 @@ body {
 
   .name-form__error {
     min-height: 2.5em;
+  }
+
+  .password-form .name-form__error {
+    min-height: 1.25em;
+  }
+
+  .password-requirements {
+    gap: clamp(.34rem, 2.2vw, .62rem);
+    font-size: clamp(.72rem, 3.2vw, .86rem);
   }
 
   .role-grid {
