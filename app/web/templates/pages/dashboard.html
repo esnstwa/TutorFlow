@@ -51,7 +51,7 @@
     <div class="dashboard-card-heading"><h2 id="quick-title">Быстрые действия</h2></div>
     <div class="dashboard-actions">
       {% for symbol, label, modal in [('plus', 'Создать занятие', 'lesson'), ('assignment', 'Выдать задание', 'assignment'), ('user-plus', 'Добавить ученика', 'student'), ('upload', 'Загрузить материал', 'material')] %}
-      <button type="button" class="dashboard-action" data-open-modal="{{ modal }}">{{ icon(symbol) }}<span>{{ label }}</span></button>
+      <button type="button" class="dashboard-action" {% if modal == 'assignment' %}data-homework-open{% else %}data-open-modal="{{ modal }}"{% endif %}>{{ icon(symbol) }}<span>{{ label }}</span></button>
       {% endfor %}
     </div>
   </section>

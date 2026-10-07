@@ -7,7 +7,17 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models import Assignment, AssignmentSubmission, Conversation, FileResource, Lesson, Message, Student, User
+from app.models import (
+    Conversation,
+    FileResource,
+    Homework,
+    HomeworkRecipient,
+    HomeworkSubmission,
+    Lesson,
+    Message,
+    Student,
+    User,
+)
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 
@@ -23,6 +33,12 @@ def seed_dev_data(db: Session) -> User:
         db.add(teacher)
         db.flush()
 
+    student_user = db.scalar(select(User).where(User.email == "student@tutorflow.local"))
+    if not student_user:
+        student_user = User(id=2, email="student@tutorflow.local", password_hash="dev-only-not-a-login", first_name="Михаил", last_name="Ковалёв", role="student")
+        db.add(student_user)
+        db.flush()
+
     students_data = [
         (1, "Михаил", "Ковалёв", "m.kovalev@example.test", "Математика", "9 класс"),
         (2, "София", "Смирнова", "s.smirnova@example.test", "Математика", "7 класс"),
@@ -30,7 +46,10 @@ def seed_dev_data(db: Session) -> User:
     ]
     for item_id, first, last, email, subject, grade in students_data:
         if not db.get(Student, item_id):
-            db.add(Student(id=item_id, teacher_id=teacher.id, first_name=first, last_name=last, email=email, subject=subject, grade=grade))
+            db.add(Student(id=item_id, teacher_id=teacher.id, user_id=student_user.id if item_id == 1 else None, first_name=first, last_name=last, email=email, subject=subject, grade=grade))
+    first_student = db.get(Student, 1)
+    if first_student and first_student.user_id is None:
+        first_student.user_id = student_user.id
     db.flush()
 
     materials_data = [
@@ -62,18 +81,33 @@ def seed_dev_data(db: Session) -> User:
                 lesson.materials.append(db.get(FileResource, 301))
             db.add(lesson)
 
-    assignments_data = [
-        (201, 1, "Квадратные уравнения", "Математика", "2026-09-30T23:59:00", "under_review"),
-        (202, 3, "Законы Ньютона", "Физика", "2026-09-28T23:59:00", "assigned"),
-        (203, 2, "Линейные функции", "Математика", "2026-10-02T23:59:00", "assigned"),
+    homeworks_data = [
+        (201, 101, "Квадратные уравнения", "Решите упражнения 1–5 из приложенного материала.", "2026-09-30T23:59:00"),
+        (202, 103, "Законы Ньютона", "Подготовьте краткие ответы на вопросы после параграфа.", "2026-09-28T23:59:00"),
+        (203, 102, "Линейные функции", "Постройте графики трёх функций.", "2026-10-12T23:59:00"),
     ]
-    for item_id, student_id, title, subject, due, status in assignments_data:
-        if not db.get(Assignment, item_id):
-            db.add(Assignment(id=item_id, teacher_id=teacher.id, student_id=student_id, title=title, description="", subject=subject, due_at=dt(due), status=status))
+    for item_id, lesson_id, title, description, due in homeworks_data:
+        if not db.get(Homework, item_id):
+            homework = Homework(id=item_id, teacher_id=teacher.id, lesson_id=lesson_id, title=title, description=description, due_at=dt(due))
+            if item_id == 201:
+                homework.attachments.append(db.get(FileResource, 301))
+            db.add(homework)
     db.flush()
 
-    if not db.get(AssignmentSubmission, 501):
-        db.add(AssignmentSubmission(id=501, assignment_id=201, student_id=1, attempt_number=1, comment="Решение задания", status="under_review", submitted_at=dt("2026-09-29T12:18:00")))
+    recipients_data = [
+        (201, 201, 1, "SUBMITTED", "2026-09-29T12:18:00"),
+        (202, 202, 3, "ASSIGNED", None),
+        (203, 203, 1, "ASSIGNED", None),
+        (204, 203, 2, "ASSIGNED", None),
+    ]
+    for recipient_id, homework_id, student_id, status, submitted in recipients_data:
+        existing = db.scalar(select(HomeworkRecipient).where(HomeworkRecipient.homework_id == homework_id, HomeworkRecipient.student_id == student_id))
+        if not existing and not db.get(HomeworkRecipient, recipient_id):
+            db.add(HomeworkRecipient(id=recipient_id, homework_id=homework_id, student_id=student_id, status=status, assigned_at=dt("2026-09-28T12:00:00"), submitted_at=dt(submitted) if submitted else None))
+    db.flush()
+
+    if not db.get(HomeworkSubmission, 501):
+        db.add(HomeworkSubmission(id=501, homework_recipient_id=201, comment="Решение задания", created_at=dt("2026-09-29T12:18:00"), updated_at=dt("2026-09-29T12:18:00")))
 
     if not db.get(Conversation, 601):
         conversation = Conversation(id=601, teacher_id=teacher.id, student_id=2)
@@ -85,7 +119,7 @@ def seed_dev_data(db: Session) -> User:
 
     db.flush()
     if db.bind and db.bind.dialect.name == "postgresql":
-        for table_name in ("users", "students", "lessons", "assignments", "assignment_submissions", "files", "conversations", "messages"):
+        for table_name in ("users", "students", "lessons", "homeworks", "homework_recipients", "homework_submissions", "files", "conversations", "messages"):
             db.execute(text(f"SELECT setval(pg_get_serial_sequence('{table_name}', 'id'), COALESCE(MAX(id), 1), true) FROM {table_name}"))
     db.commit()
     return teacher

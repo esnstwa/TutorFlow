@@ -9,12 +9,20 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.homework.schemas import HomeworkCreate
+from app.homework.service import (
+    homework_dict,
+    recipient_dict,
+    teacher_homework,
+    teacher_homeworks,
+    teacher_recipient,
+)
 from app.models import (
-    Assignment,
-    AssignmentReview,
-    AssignmentSubmission,
     Conversation,
     FileResource,
+    Homework,
+    HomeworkRecipient,
+    HomeworkReview,
     Lesson,
     Message,
     Student,
@@ -23,16 +31,7 @@ from app.models import (
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 LESSON_STATUSES = {"scheduled", "completed_unpaid", "completed_paid", "cancelled"}
-ASSIGNMENT_STATUSES = {"draft", "assigned", "submitted", "under_review", "revision_requested", "reviewed"}
 MONTHS = ("", "января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
-ASSIGNMENT_LABELS = {
-    "draft": "Черновик",
-    "assigned": "Выдано",
-    "submitted": "Сдано",
-    "under_review": "На проверке",
-    "revision_requested": "На доработке",
-    "reviewed": "Проверено",
-}
 
 
 def local_datetime(date_value: str, time_value: str) -> datetime:
@@ -108,53 +107,28 @@ def lesson_dict(lesson: Lesson, *, next_id: int | None = None) -> dict[str, Any]
         "teacher_note": lesson.teacher_note,
         "materials": [item.title for item in lesson.materials],
         "material_items": [file_dict(item) for item in lesson.materials],
+        "homeworks": [homework_dict(item, include_recipients=False) for item in lesson.homeworks],
     }
 
 
-def assignment_dict(item: Assignment) -> dict[str, Any]:
+def assignment_dict(item: Homework) -> dict[str, Any]:
+    """Compatibility serializer for templates that still call assignments homeworks."""
+    return homework_dict(item)
+
+
+def submission_dict(item: HomeworkRecipient) -> dict[str, Any]:
+    row = recipient_dict(item, include_history=True)
+    row["assignment"] = homework_dict(item.homework, include_recipients=False)
+    return row
+
+
+def review_dict(item: HomeworkReview) -> dict[str, Any]:
     return {
         "id": item.id,
-        "student_id": item.student_id,
-        "student": student_dict(item.student),
-        "title": item.title,
-        "description": item.description,
-        "subject": item.subject,
-        "due": date_label(item.due_at),
-        "due_at": item.due_at.isoformat(),
-        "status_value": item.status,
-        "status": ASSIGNMENT_LABELS[item.status],
-        "materials": [file_dict(material) for material in item.materials],
-    }
-
-
-def submission_dict(item: AssignmentSubmission) -> dict[str, Any]:
-    return {
-        "id": item.id,
-        "assignment_id": item.assignment_id,
-        "student_id": item.student_id,
-        "student": student_dict(item.student),
-        "assignment": assignment_dict(item.assignment),
-        "attempt_number": item.attempt_number,
-        "comment": item.comment,
-        "status_value": item.status,
-        "status": ASSIGNMENT_LABELS.get(item.status, item.status),
-        "submitted": localize(item.submitted_at).strftime("%d.%m.%Y, %H:%M"),
-        "submitted_at": item.submitted_at.isoformat(),
-        "files": [file_dict(file) for file in item.files],
-        "reviews": [review_dict(review) for review in item.reviews],
-    }
-
-
-def review_dict(item: AssignmentReview) -> dict[str, Any]:
-    return {
-        "id": item.id,
-        "submission_id": item.submission_id,
-        "result": item.result,
-        "score": item.score,
-        "max_score": item.max_score,
-        "comment": item.comment,
-        "reviewed_at": item.reviewed_at.isoformat(),
-        "files": [file_dict(file) for file in item.files],
+        "recipient_id": item.homework_recipient_id,
+        "result": item.action,
+        "comment": item.teacher_comment,
+        "reviewed_at": item.created_at.isoformat(),
     }
 
 
@@ -178,48 +152,46 @@ def scoped_student(db: Session, teacher_id: int, student_id: int) -> Student | N
 def scoped_lesson(db: Session, teacher_id: int, lesson_id: int) -> Lesson | None:
     return db.scalar(
         select(Lesson)
-        .options(selectinload(Lesson.student).selectinload(Student.user), selectinload(Lesson.materials))
+        .options(
+            selectinload(Lesson.student).selectinload(Student.user),
+            selectinload(Lesson.materials),
+            selectinload(Lesson.homeworks).selectinload(Homework.attachments),
+            selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.student),
+            selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.submissions),
+            selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.reviews),
+        )
         .where(Lesson.id == lesson_id, Lesson.teacher_id == teacher_id)
     )
 
 
-def scoped_assignment(db: Session, teacher_id: int, assignment_id: int) -> Assignment | None:
+def scoped_assignment(db: Session, teacher_id: int, assignment_id: int) -> Homework | None:
+    return teacher_homework(db, teacher_id, assignment_id)
+
+
+def scoped_submission(db: Session, teacher_id: int, submission_id: int) -> HomeworkRecipient | None:
+    return teacher_recipient(db, teacher_id, submission_id)
+
+
+def scoped_review(db: Session, teacher_id: int, review_id: int) -> HomeworkReview | None:
     return db.scalar(
-        select(Assignment)
-        .options(selectinload(Assignment.student).selectinload(Student.user), selectinload(Assignment.materials))
-        .where(Assignment.id == assignment_id, Assignment.teacher_id == teacher_id)
-    )
-
-
-def scoped_submission(db: Session, teacher_id: int, submission_id: int) -> AssignmentSubmission | None:
-    return db.scalar(
-        select(AssignmentSubmission)
-        .join(Assignment)
-        .options(
-            selectinload(AssignmentSubmission.student).selectinload(Student.user),
-            selectinload(AssignmentSubmission.assignment).selectinload(Assignment.student).selectinload(Student.user),
-            selectinload(AssignmentSubmission.assignment).selectinload(Assignment.materials),
-            selectinload(AssignmentSubmission.files),
-            selectinload(AssignmentSubmission.reviews).selectinload(AssignmentReview.files),
-        )
-        .where(AssignmentSubmission.id == submission_id, Assignment.teacher_id == teacher_id)
-    )
-
-
-def scoped_review(db: Session, teacher_id: int, review_id: int) -> AssignmentReview | None:
-    return db.scalar(
-        select(AssignmentReview)
-        .join(AssignmentSubmission)
-        .join(Assignment)
-        .options(selectinload(AssignmentReview.files))
-        .where(AssignmentReview.id == review_id, Assignment.teacher_id == teacher_id)
+        select(HomeworkReview)
+        .join(HomeworkRecipient)
+        .join(Homework)
+        .where(HomeworkReview.id == review_id, Homework.teacher_id == teacher_id)
     )
 
 
 def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
     students = list(db.scalars(select(Student).options(selectinload(Student.user)).where(Student.teacher_id == teacher.id).order_by(Student.id)))
-    lessons = list(db.scalars(select(Lesson).options(selectinload(Lesson.student).selectinload(Student.user), selectinload(Lesson.materials)).where(Lesson.teacher_id == teacher.id).order_by(Lesson.start_at)))
-    assignments = list(db.scalars(select(Assignment).options(selectinload(Assignment.student).selectinload(Student.user), selectinload(Assignment.materials)).where(Assignment.teacher_id == teacher.id).order_by(Assignment.due_at)))
+    lessons = list(db.scalars(select(Lesson).options(
+        selectinload(Lesson.student).selectinload(Student.user),
+        selectinload(Lesson.materials),
+        selectinload(Lesson.homeworks).selectinload(Homework.attachments),
+        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.student),
+        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.submissions),
+        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.reviews),
+    ).where(Lesson.teacher_id == teacher.id).order_by(Lesson.start_at)))
+    assignments = teacher_homeworks(db, teacher.id)
     materials = list(db.scalars(select(FileResource).where(FileResource.owner_id == teacher.id).order_by(FileResource.id)))
     now = datetime.now(timezone.utc)
     next_lesson = next((item for item in lessons if item.start_at.replace(tzinfo=item.start_at.tzinfo or timezone.utc) >= now and item.status == "scheduled"), lessons[0] if lessons else None)
@@ -243,12 +215,12 @@ def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
 
 def notification_rows(db: Session, teacher_id: int) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    submission = db.scalar(select(AssignmentSubmission).join(Assignment).options(selectinload(AssignmentSubmission.student), selectinload(AssignmentSubmission.assignment)).where(Assignment.teacher_id == teacher_id).order_by(AssignmentSubmission.submitted_at.desc()))
+    submission = db.scalar(select(HomeworkRecipient).join(Homework).options(selectinload(HomeworkRecipient.student), selectinload(HomeworkRecipient.homework)).where(Homework.teacher_id == teacher_id, HomeworkRecipient.status == "SUBMITTED").order_by(HomeworkRecipient.submitted_at.desc()))
     if submission:
-        rows.append({"id": submission.id, "kind": "submission", "target_id": submission.id, "icon": "assignment", "tone": "blue", "title": "Новая работа на проверку", "description": f"{student_dict(submission.student)['name']} · {submission.assignment.title}", "when": "Недавно"})
-    overdue = db.scalar(select(Assignment).options(selectinload(Assignment.student)).where(Assignment.teacher_id == teacher_id, Assignment.due_at < datetime.now(timezone.utc), Assignment.status.not_in(("reviewed", "draft"))).order_by(Assignment.due_at))
+        rows.append({"id": submission.id, "kind": "submission", "target_id": submission.id, "icon": "assignment", "tone": "blue", "title": "Новая работа на проверку", "description": f"{student_dict(submission.student)['name']} · {submission.homework.title}", "when": "Недавно"})
+    overdue = db.scalar(select(HomeworkRecipient).join(Homework).options(selectinload(HomeworkRecipient.student), selectinload(HomeworkRecipient.homework)).where(Homework.teacher_id == teacher_id, Homework.due_at < datetime.now(timezone.utc), HomeworkRecipient.status == "ASSIGNED").order_by(Homework.due_at))
     if overdue:
-        rows.append({"id": overdue.id, "kind": "assignment", "target_id": overdue.id, "icon": "alert", "tone": "orange", "title": "Просроченное задание", "description": f"{student_dict(overdue.student)['name']} · {overdue.title}", "when": date_label(overdue.due_at)})
+        rows.append({"id": overdue.homework_id, "kind": "assignment", "target_id": overdue.homework_id, "icon": "alert", "tone": "orange", "title": "Просроченное задание", "description": f"{student_dict(overdue.student)['name']} · {overdue.homework.title}", "when": date_label(overdue.homework.due_at)})
     conversation = db.scalar(select(Conversation).options(selectinload(Conversation.student), selectinload(Conversation.messages)).where(Conversation.teacher_id == teacher_id).order_by(Conversation.updated_at.desc()))
     if conversation and conversation.messages:
         message = sorted(conversation.messages, key=lambda item: item.sent_at)[-1]
@@ -257,7 +229,14 @@ def notification_rows(db: Session, teacher_id: int) -> list[dict[str, Any]]:
 
 
 def calendar_events(db: Session, teacher: User, *, date_from: date | None = None, date_to: date | None = None) -> list[dict[str, Any]]:
-    stmt = select(Lesson).options(selectinload(Lesson.student).selectinload(Student.user), selectinload(Lesson.materials)).where(Lesson.teacher_id == teacher.id)
+    stmt = select(Lesson).options(
+        selectinload(Lesson.student).selectinload(Student.user),
+        selectinload(Lesson.materials),
+        selectinload(Lesson.homeworks).selectinload(Homework.attachments),
+        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.student),
+        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.submissions),
+        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.reviews),
+    ).where(Lesson.teacher_id == teacher.id)
     if date_from:
         stmt = stmt.where(Lesson.start_at >= datetime.combine(date_from, time.min, tzinfo=MOSCOW))
     if date_to:
@@ -272,10 +251,10 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
             "avatar": row["student"]["initials"], "date": row["date_iso"], "start": row["start"], "end": row["end"],
             "url": f"/lessons/{lesson.id}", "draggable": True, "status": lesson.status, "lesson": row,
         })
-    submissions = list(db.scalars(select(AssignmentSubmission).join(Assignment).where(Assignment.teacher_id == teacher.id, AssignmentSubmission.status.in_(("submitted", "under_review")))))
+    submissions = list(db.scalars(select(HomeworkRecipient).join(Homework).where(Homework.teacher_id == teacher.id, HomeworkRecipient.status == "SUBMITTED")))
     for item in submissions:
         submitted = localize(item.submitted_at)
-        events.append({"id": f"review-{item.id}", "type": "reviews", "title": "Проверка задания", "subtitle": f"Попытка {item.attempt_number}", "date": submitted.date().isoformat(), "start": submitted.strftime("%H:00"), "end": (submitted + timedelta(hours=1)).strftime("%H:00"), "url": f"/submissions/{item.id}", "draggable": False})
+        events.append({"id": f"review-{item.id}", "type": "reviews", "title": "Проверка задания", "subtitle": "Работа ученика", "date": submitted.date().isoformat(), "start": submitted.strftime("%H:00"), "end": (submitted + timedelta(hours=1)).strftime("%H:00"), "url": f"/homework-recipients/{item.id}", "draggable": False})
     return events
 
 
@@ -308,18 +287,16 @@ def create_entity(db: Session, teacher: User, kind: str, payload: dict[str, Any]
         item.student = student
         return lesson_dict(item)
     if kind == "assignment":
-        student = scoped_student(db, teacher.id, int(payload["student_id"]))
-        if not student:
-            raise ValueError("Ученик не найден")
         due = datetime.combine(date.fromisoformat(str(payload["due"])), time(23, 59), tzinfo=MOSCOW)
-        status = str(payload.get("status", "assigned"))
-        if status not in ASSIGNMENT_STATUSES:
-            raise ValueError("Неизвестный статус задания")
-        item = Assignment(teacher_id=teacher.id, student_id=student.id, title=str(payload["title"]).strip(), description=str(payload.get("description", "")), subject=str(payload.get("subject") or student.subject), due_at=due, status=status)
-        db.add(item)
-        db.flush()
-        item.student = student
-        return assignment_dict(item)
+        data = HomeworkCreate(
+            title=str(payload["title"]).strip(),
+            description=str(payload.get("description") or payload["title"]).strip(),
+            recipient_ids=[int(payload["student_id"])],
+            due_at=due,
+        )
+        from app.homework.service import create_homework
+
+        return assignment_dict(create_homework(db, teacher, data))
     if kind == "material":
         title = str(payload["title"]).strip()
         kind_value = str(payload["kind"]).strip()

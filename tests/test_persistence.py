@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.auth import get_current_teacher
 from app.core.database import get_db
 from app.main import app
-from app.models import Assignment, Lesson, Student, User
+from app.models import Homework, HomeworkRecipient, Lesson, Student, User
 from tests.conftest import TestingSessionLocal
 
 client = TestClient(app)
@@ -60,33 +60,35 @@ def test_lesson_crud_status_note_and_date_range() -> None:
     assert client.delete(f"/api/mock/lessons/{lesson_id}").status_code == 200
 
 
-def test_assignment_submission_files_multiple_attempts_and_review(tmp_path, monkeypatch) -> None:
+def test_homework_submission_files_multiple_attempts_and_review(tmp_path, monkeypatch) -> None:
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "file_storage_path", str(tmp_path / "uploads"))
-    assignment_response = client.post("/api/assignments", json={"student_id": "1", "title": "Тестовое задание", "due": "2026-12-01"})
-    assignment_id = assignment_response.json()["assignment"]["id"]
-    file_response = client.post("/api/files/upload", content=b"pdf-content", headers={"X-Filename": "solution.pdf", "X-Title": "Solution.pdf", "Content-Type": "application/pdf"})
+    assignment_response = client.post("/api/homework", json={"recipient_ids": [1], "title": "Тестовое задание", "description": "Решить задачи", "due_at": "2026-12-01T18:00:00+03:00"})
+    assert assignment_response.status_code == 200
+    assignment_id = assignment_response.json()["homework"]["id"]
+    recipient_id = assignment_response.json()["homework"]["recipients"][0]["id"]
+    file_response = client.post("/api/student/files/upload", content=b"pdf-content", headers={"X-Filename": "solution.pdf", "X-Title": "Solution.pdf", "Content-Type": "application/pdf"})
     material = file_response.json()["file"]
     material_id = material["id"]
     assert material["size"] == len(b"pdf-content")
 
-    first = client.post(f"/api/assignments/{assignment_id}/submissions", json={"comment": "Первая попытка", "file_ids": [material_id]})
-    second = client.post(f"/api/assignments/{assignment_id}/submissions", json={"comment": "Вторая попытка", "file_ids": [material_id]})
-    assert first.json()["submission"]["attempt_number"] == 1
-    assert second.json()["submission"]["attempt_number"] == 2
-    assert second.json()["submission"]["files"][0]["id"] == material_id
-
-    submission_id = second.json()["submission"]["id"]
-    review = client.post(f"/api/submissions/{submission_id}/reviews", json={"result": "revision_requested", "score": 6, "max_score": 10, "comment": "Исправить второй пункт"})
+    first = client.post(f"/api/student/homework/{recipient_id}/submissions", json={"comment": "Первая попытка", "attachment_ids": [material_id]})
+    assert first.status_code == 200
+    review = client.post(f"/api/homework-recipients/{recipient_id}/reviews", json={"action": "REVISION_REQUIRED", "teacher_comment": "Исправить второй пункт"})
     assert review.status_code == 200
-    assert review.json()["review"]["result"] == "revision_requested"
+    second = client.post(f"/api/student/homework/{recipient_id}/submissions", json={"comment": "Вторая попытка", "attachment_ids": [material_id]})
+    assert second.status_code == 200
+    assert len(second.json()["recipient"]["submissions"]) == 2
+    accepted = client.post(f"/api/homework-recipients/{recipient_id}/reviews", json={"action": "COMPLETED", "teacher_comment": "Принято"})
+    assert accepted.status_code == 200
     with TestingSessionLocal() as new_session:
-        assignment = new_session.get(Assignment, assignment_id)
-        assert assignment.status == "revision_requested"
+        assert new_session.get(Homework, assignment_id) is not None
+        recipient = new_session.get(HomeworkRecipient, recipient_id)
+        assert recipient.status == "COMPLETED"
+        assert len(recipient.submissions) == 2
 
-    assert client.delete(f"/api/materials/{material_id}").status_code == 200
-    assert not (tmp_path / "uploads" / material["stored_name"]).exists()
+    assert (tmp_path / "uploads" / material["stored_name"]).exists()
 
 
 def test_teacher_cannot_access_another_teachers_data() -> None:

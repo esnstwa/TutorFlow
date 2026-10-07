@@ -1,0 +1,17 @@
+<dialog class="homework-modal" data-homework-modal aria-labelledby="homework-modal-title">
+  <form class="homework-modal-card" data-homework-form>
+    <header><div><span>Домашнее задание</span><h2 id="homework-modal-title">Выдать задание</h2></div><button type="button" data-homework-close aria-label="Закрыть">{{ icon('close') }}</button></header>
+    <div class="homework-modal-body">
+      <input type="hidden" name="lesson_id">
+      <label><span>Название *</span><input name="title" maxlength="200" required placeholder="Например, упражнения 5–8"></label>
+      <label><span>Описание</span><textarea name="description" rows="5" maxlength="20000" placeholder="Что нужно сделать"></textarea></label>
+      <label><span>Получатели *</span><div class="homework-recipient-box"><div data-homework-chips></div><input type="search" data-homework-student-search autocomplete="off" placeholder="Начните вводить имя или фамилию"></div></label>
+      <div class="homework-search-results" data-homework-search-results hidden></div>
+      <label><span>Дедлайн</span><input type="datetime-local" name="due_at"></label>
+      <label class="homework-file-field"><span>Материалы</span><input type="file" multiple data-homework-files><small>Можно выбрать несколько файлов</small></label>
+      <div class="homework-file-list" data-homework-file-list></div>
+      <p class="dashboard-form-error" data-homework-error role="alert" hidden></p>
+    </div>
+    <footer><button type="button" class="dashboard-secondary" data-homework-close>Отмена</button><button type="submit" class="dashboard-primary" data-homework-submit>Выдать задание</button></footer>
+  </form>
+</dialog>

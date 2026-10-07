@@ -1,3 +1,16 @@
 {% extends "teacher_layout.html" %}
-{% block teacher_title %}Задания{% endblock %}{% block page_heading %}Задания{% endblock %}{% block page_description %}Выданные задания и работы на проверку.{% endblock %}
-{% block teacher_content %}<section class="dashboard-card dashboard-page-card"><div class="dashboard-section-toolbar"><h2>Все задания</h2><button class="dashboard-primary" data-open-modal="assignment">{{ icon('plus') }}Выдать задание</button></div>{% if assignments %}<div class="dashboard-entity-list">{% for item in assignments %}<a class="dashboard-entity-row" href="{{ url_for('assignment', assignment_id=item.id) }}" data-spa><span class="dashboard-attention-icon dashboard-attention-icon--blue">{{ icon('assignment') }}</span><span class="dashboard-entity-main"><strong>{{ item.title }}</strong><span>{{ item.student.name }} · до {{ item.due }}</span></span><span class="dashboard-status{% if item.status == 'Просрочено' %} is-warning{% endif %}">{{ item.status }}</span>{{ icon('chevron') }}</a>{% endfor %}</div>{% else %}<div class="dashboard-empty"><h3>Заданий пока нет</h3><p>Выдайте первое задание.</p></div>{% endif %}</section>{% endblock %}
+{% block teacher_title %}Задания{% endblock %}
+{% block teacher_header %}<div class="dashboard-page-heading"><h1>Задания</h1><p>Выдавайте задания и следите за работами учеников.</p></div><button class="dashboard-primary" type="button" data-homework-open>{{ icon('plus') }}Выдать задание</button>{% endblock %}
+{% block teacher_content %}
+<section class="homework-page" data-homework-list-page>
+  <div class="homework-list-toolbar"><div class="homework-filters" role="group" aria-label="Фильтр заданий"><button class="is-active" data-homework-filter="">Все</button><button data-homework-filter="waiting">Ждут выполнения</button><button data-homework-filter="review">На проверке</button><button data-homework-filter="completed">Завершённые</button></div><label class="homework-search"><span class="sr-only">Поиск</span><input type="search" data-homework-list-search placeholder="Поиск по заданиям"></label></div>
+  <div class="homework-loading" data-homework-loading hidden>Загружаем задания…</div>
+  <div class="homework-grid" data-homework-list>
+  {% for item in assignments %}<a class="homework-card" href="{{ url_for('assignment', assignment_id=item.id) }}" data-homework-card data-title="{{ (item.title ~ ' ' ~ (item.description or ''))|lower }}" data-counts='{{ item.counts|tojson }}'>
+    <div class="homework-card-top"><span class="dashboard-attention-icon dashboard-attention-icon--blue">{{ icon('assignment') }}</span><span class="homework-deadline">{{ item.due }}</span></div><h2>{{ item.title }}</h2><p>{{ item.lesson.subject if item.lesson else 'Самостоятельное задание' }}{% if item.lesson %} · {{ item.lesson.date }}{% endif %}</p>
+    <div class="homework-stats"><span><strong>{{ item.recipient_count }}</strong> учеников</span><span><strong>{{ item.counts.ASSIGNED + item.counts.REVISION_REQUIRED + item.counts.OVERDUE }}</strong> выполняют</span><span><strong>{{ item.counts.SUBMITTED }}</strong> на проверке</span><span><strong>{{ item.counts.COMPLETED }}</strong> завершили</span></div>
+  </a>{% endfor %}
+  </div>
+  <div class="dashboard-empty" data-homework-empty {% if assignments %}hidden{% endif %}><h3>Заданий пока нет</h3><p>Выдайте первое задание ученикам.</p></div>
+</section>
+{% endblock %}

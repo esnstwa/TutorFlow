@@ -190,6 +190,13 @@
       lessonForm.querySelectorAll(".schedule-status-option").forEach((option) => option.classList.toggle("is-selected", option.querySelector("input").checked));
     }
 
+    function renderLessonHomeworks(rows = []) {
+      const node = root.querySelector("[data-lesson-homeworks]");
+      if (!node) return;
+      if (!rows.length) { node.innerHTML = '<div class="schedule-homework-empty"><p>Домашнее задание пока не выдано</p><button type="button" data-lesson-homework-add>+ Добавить домашнее задание</button></div>'; return; }
+      node.innerHTML = rows.map((item) => `<article class="schedule-homework-card"><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml((item.description || "Без описания").slice(0, 100))}</p><small>${escapeHtml(item.due)} · ${item.recipient_count} учеников</small></div><a href="/assignments/${item.id}">Открыть задание</a></article>`).join("") + '<button class="schedule-homework-more" type="button" data-lesson-homework-add>+ Добавить ещё</button>';
+    }
+
     function openLesson(eventItem) {
       const lesson = eventItem.lesson;
       if (!lesson) return;
@@ -205,6 +212,7 @@
       root.querySelector("[data-lesson-date]").textContent = capitalize(new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(parseDate(lesson.date_iso)));
       root.querySelector("[data-lesson-time]").textContent = `${lesson.start}–${lesson.end} · ${durationLabel(lesson.start, lesson.end)}`;
       renderMaterials(lesson.materials || []);
+      renderLessonHomeworks(lesson.homeworks || []);
       updateNoteCount();
       syncStatusSelection();
       root.querySelector("[data-lesson-error]").hidden = true;
@@ -265,6 +273,10 @@
         event.target.closest(".schedule-material-row").remove();
         if (!materialList.children.length) renderMaterials();
       } else if (event.target.closest("[data-lesson-delete]")) deleteActiveLesson();
+      else if (event.target.closest("[data-lesson-homework-add]")) {
+        const lesson = activeLessonEvent?.lesson;
+        if (lesson) document.dispatchEvent(new CustomEvent("tutorflow:open-homework", { detail: { lesson_id: lesson.id, recipient_ids: [lesson.student.id] } }));
+      }
       else if (event.target.closest("[data-event-close]")) root.querySelector("[data-event-dialog]").close();
       else if (event.target === root.querySelector("[data-event-dialog]")) root.querySelector("[data-event-dialog]").close();
       else if (event.target.closest("[data-google-connect]")) root.querySelector("[data-google-note]").hidden = false;
@@ -285,6 +297,11 @@
     });
 
     lessonDialog.addEventListener("cancel", (event) => { event.preventDefault(); closeLesson(); });
+    document.addEventListener("tutorflow:homework-created", (event) => {
+      if (!activeLessonEvent?.lesson || Number(event.detail.lesson?.id) !== Number(activeLessonEvent.lesson.id)) return;
+      activeLessonEvent.lesson.homeworks = [...(activeLessonEvent.lesson.homeworks || []), event.detail];
+      renderLessonHomeworks(activeLessonEvent.lesson.homeworks);
+    });
 
     lessonForm.addEventListener("submit", async (event) => {
       event.preventDefault();

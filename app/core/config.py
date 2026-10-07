@@ -7,6 +7,7 @@ class Settings(BaseSettings):
         "postgresql+psycopg://tutorflow:tutorflow@localhost:5432/tutorflow"
     )
     dev_teacher_email: str = "anna@tutorflow.local"
+    dev_student_email: str = "student@tutorflow.local"
     enable_dev_teacher_fallback: bool = True
     file_storage_path: str = "var/uploads"
 

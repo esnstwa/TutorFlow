@@ -2,7 +2,7 @@
 {% from "components/dashboard_icons.html" import icon %}
 
 {% block title %}{% block teacher_title %}Кабинет преподавателя{% endblock %} · TutorFlow{% endblock %}
-{% block styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/schedule.css') }}?v=20261006">{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/schedule.css') }}?v={{ static_version('css/schedule.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/homework.css') }}?v={{ static_version('css/homework.css') }}">{% endblock %}
 
 {% block content %}
 <div class="teacher-dashboard" data-teacher-shell>
@@ -48,9 +48,10 @@
       <div class="dashboard-modal-actions"><button type="button" class="dashboard-secondary" data-modal-close>Отмена</button><button type="submit" class="dashboard-primary" data-modal-submit>Создать</button></div>
     </form>
   </dialog>
+  {% include "components/homework_modal.html" %}
   <div class="dashboard-toast" data-toast role="status" hidden></div>
   <script type="application/json" data-student-options>{{ students|tojson }}</script>
 </div>
 {% endblock %}
 
-{% block scripts %}<script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script><script src="{{ url_for('static', path='/js/schedule.js') }}?v=20261006" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script><script src="{{ url_for('static', path='/js/homework.js') }}?v={{ static_version('js/homework.js') }}" defer></script><script src="{{ url_for('static', path='/js/schedule.js') }}?v={{ static_version('js/schedule.js') }}" defer></script>{% endblock %}

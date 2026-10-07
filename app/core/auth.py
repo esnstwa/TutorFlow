@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import User
+from app.models import Student, User
 
 
 def get_current_teacher(request: Request, db: Session = Depends(get_db)) -> User:
@@ -26,3 +26,22 @@ def get_current_teacher(request: Request, db: Session = Depends(get_db)) -> User
     if not teacher or teacher.role != "teacher":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация преподавателя")
     return teacher
+
+
+def get_current_student(request: Request, db: Session = Depends(get_db)) -> Student:
+    """Resolve the authenticated student's profile through the canonical user link."""
+    principal = getattr(request.state, "user", None)
+    if isinstance(principal, User):
+        user = db.get(User, principal.id)
+    elif getattr(principal, "id", None):
+        user = db.get(User, int(principal.id))
+    elif settings.enable_dev_teacher_fallback:
+        user = db.scalar(select(User).where(User.email == settings.dev_student_email))
+    else:
+        user = None
+    if not user or user.role != "student":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация ученика")
+    student = db.scalar(select(Student).where(Student.user_id == user.id))
+    if not student:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Профиль ученика не найден")
+    return student

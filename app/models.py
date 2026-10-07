@@ -24,24 +24,17 @@ lesson_materials = Table(
     Column("file_id", ForeignKey("files.id", ondelete="CASCADE"), primary_key=True),
 )
 
-assignment_materials = Table(
-    "assignment_materials",
+homework_attachments = Table(
+    "homework_attachments",
     Base.metadata,
-    Column("assignment_id", ForeignKey("assignments.id", ondelete="CASCADE"), primary_key=True),
+    Column("homework_id", ForeignKey("homeworks.id", ondelete="CASCADE"), primary_key=True),
     Column("file_id", ForeignKey("files.id", ondelete="CASCADE"), primary_key=True),
 )
 
-submission_files = Table(
-    "submission_files",
+homework_submission_attachments = Table(
+    "homework_submission_attachments",
     Base.metadata,
-    Column("submission_id", ForeignKey("assignment_submissions.id", ondelete="CASCADE"), primary_key=True),
-    Column("file_id", ForeignKey("files.id", ondelete="CASCADE"), primary_key=True),
-)
-
-review_files = Table(
-    "review_files",
-    Base.metadata,
-    Column("review_id", ForeignKey("assignment_reviews.id", ondelete="CASCADE"), primary_key=True),
+    Column("submission_id", ForeignKey("homework_submissions.id", ondelete="CASCADE"), primary_key=True),
     Column("file_id", ForeignKey("files.id", ondelete="CASCADE"), primary_key=True),
 )
 
@@ -79,8 +72,7 @@ class Student(TimestampMixin, Base):
     teacher: Mapped[User] = relationship(back_populates="students", foreign_keys=[teacher_id])
     user: Mapped[User | None] = relationship(back_populates="student_profile", foreign_keys=[user_id])
     lessons: Mapped[list[Lesson]] = relationship(back_populates="student", cascade="all, delete-orphan")
-    assignments: Mapped[list[Assignment]] = relationship(back_populates="student", cascade="all, delete-orphan")
-    submissions: Mapped[list[AssignmentSubmission]] = relationship(back_populates="student", cascade="all, delete-orphan")
+    homework_recipients: Mapped[list[HomeworkRecipient]] = relationship(back_populates="student", cascade="all, delete-orphan")
 
 
 class Lesson(TimestampMixin, Base):
@@ -107,76 +99,82 @@ class Lesson(TimestampMixin, Base):
     teacher: Mapped[User] = relationship()
     student: Mapped[Student] = relationship(back_populates="lessons")
     materials: Mapped[list[FileResource]] = relationship(secondary=lesson_materials, back_populates="lessons")
+    homeworks: Mapped[list[Homework]] = relationship(back_populates="lesson")
 
 
-class Assignment(TimestampMixin, Base):
-    __tablename__ = "assignments"
+class Homework(TimestampMixin, Base):
+    __tablename__ = "homeworks"
     __table_args__ = (
-        CheckConstraint("status IN ('draft', 'assigned', 'submitted', 'under_review', 'revision_requested', 'reviewed')", name="ck_assignments_status"),
-        Index("ix_assignments_teacher_id", "teacher_id"),
-        Index("ix_assignments_student_id", "student_id"),
-        Index("ix_assignments_due_at", "due_at"),
+        Index("ix_homeworks_teacher_id", "teacher_id"),
+        Index("ix_homeworks_lesson_id", "lesson_id"),
+        Index("ix_homeworks_due_at", "due_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    lesson_id: Mapped[int | None] = mapped_column(ForeignKey("lessons.id", ondelete="SET NULL"))
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    subject: Mapped[str] = mapped_column(String(120), nullable=False)
-    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="assigned", nullable=False)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     teacher: Mapped[User] = relationship()
-    student: Mapped[Student] = relationship(back_populates="assignments")
-    materials: Mapped[list[FileResource]] = relationship(secondary=assignment_materials, back_populates="assignments")
-    submissions: Mapped[list[AssignmentSubmission]] = relationship(back_populates="assignment", cascade="all, delete-orphan")
+    lesson: Mapped[Lesson | None] = relationship(back_populates="homeworks")
+    recipients: Mapped[list[HomeworkRecipient]] = relationship(back_populates="homework", cascade="all, delete-orphan")
+    attachments: Mapped[list[FileResource]] = relationship(secondary=homework_attachments, back_populates="homeworks")
 
 
-class AssignmentSubmission(TimestampMixin, Base):
-    __tablename__ = "assignment_submissions"
+class HomeworkRecipient(Base):
+    __tablename__ = "homework_recipients"
     __table_args__ = (
-        CheckConstraint("attempt_number > 0", name="ck_submissions_attempt_positive"),
-        CheckConstraint("status IN ('submitted', 'under_review', 'revision_requested', 'reviewed')", name="ck_submissions_status"),
-        UniqueConstraint("assignment_id", "attempt_number", name="uq_submissions_assignment_attempt"),
-        Index("ix_submissions_assignment_id", "assignment_id"),
+        CheckConstraint("status IN ('ASSIGNED', 'SUBMITTED', 'REVISION_REQUIRED', 'COMPLETED')", name="ck_homework_recipients_status"),
+        UniqueConstraint("homework_id", "student_id", name="uq_homework_recipients_homework_student"),
+        Index("ix_homework_recipients_homework_id", "homework_id"),
+        Index("ix_homework_recipients_student_id", "student_id"),
+        Index("ix_homework_recipients_status", "status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False)
+    homework_id: Mapped[int] = mapped_column(ForeignKey("homeworks.id", ondelete="CASCADE"), nullable=False)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
-    attempt_number: Mapped[int] = mapped_column(nullable=False)
-    comment: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="submitted", nullable=False)
-    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="ASSIGNED", nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    assignment: Mapped[Assignment] = relationship(back_populates="submissions")
-    student: Mapped[Student] = relationship(back_populates="submissions")
-    files: Mapped[list[FileResource]] = relationship(secondary=submission_files, back_populates="submissions")
-    reviews: Mapped[list[AssignmentReview]] = relationship(back_populates="submission", cascade="all, delete-orphan")
+    homework: Mapped[Homework] = relationship(back_populates="recipients")
+    student: Mapped[Student] = relationship(back_populates="homework_recipients")
+    submissions: Mapped[list[HomeworkSubmission]] = relationship(back_populates="recipient", cascade="all, delete-orphan", order_by="HomeworkSubmission.created_at")
+    reviews: Mapped[list[HomeworkReview]] = relationship(back_populates="recipient", cascade="all, delete-orphan", order_by="HomeworkReview.created_at")
 
 
-class AssignmentReview(TimestampMixin, Base):
-    __tablename__ = "assignment_reviews"
+class HomeworkSubmission(TimestampMixin, Base):
+    __tablename__ = "homework_submissions"
     __table_args__ = (
-        CheckConstraint("result IN ('accepted', 'revision_requested')", name="ck_reviews_result"),
-        CheckConstraint("score IS NULL OR score >= 0", name="ck_reviews_score_nonnegative"),
-        CheckConstraint("max_score IS NULL OR max_score > 0", name="ck_reviews_max_score_positive"),
-        CheckConstraint("score IS NULL OR max_score IS NULL OR score <= max_score", name="ck_reviews_score_lte_max"),
+        Index("ix_homework_submissions_recipient_id", "homework_recipient_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    submission_id: Mapped[int] = mapped_column(ForeignKey("assignment_submissions.id", ondelete="CASCADE"), nullable=False, index=True)
-    teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    result: Mapped[str] = mapped_column(String(32), nullable=False)
-    score: Mapped[int | None]
-    max_score: Mapped[int | None]
+    homework_recipient_id: Mapped[int] = mapped_column(ForeignKey("homework_recipients.id", ondelete="CASCADE"), nullable=False)
     comment: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
-    submission: Mapped[AssignmentSubmission] = relationship(back_populates="reviews")
-    teacher: Mapped[User] = relationship()
-    files: Mapped[list[FileResource]] = relationship(secondary=review_files, back_populates="reviews")
+    recipient: Mapped[HomeworkRecipient] = relationship(back_populates="submissions")
+    attachments: Mapped[list[FileResource]] = relationship(secondary=homework_submission_attachments, back_populates="homework_submissions")
+
+
+class HomeworkReview(Base):
+    __tablename__ = "homework_reviews"
+    __table_args__ = (
+        CheckConstraint("action IN ('REVISION_REQUIRED', 'COMPLETED')", name="ck_homework_reviews_action"),
+        Index("ix_homework_reviews_recipient_id", "homework_recipient_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    homework_recipient_id: Mapped[int] = mapped_column(ForeignKey("homework_recipients.id", ondelete="CASCADE"), nullable=False)
+    teacher_comment: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    recipient: Mapped[HomeworkRecipient] = relationship(back_populates="reviews")
 
 
 class FileResource(TimestampMixin, Base):
@@ -197,9 +195,8 @@ class FileResource(TimestampMixin, Base):
 
     owner: Mapped[User] = relationship()
     lessons: Mapped[list[Lesson]] = relationship(secondary=lesson_materials, back_populates="materials")
-    assignments: Mapped[list[Assignment]] = relationship(secondary=assignment_materials, back_populates="materials")
-    submissions: Mapped[list[AssignmentSubmission]] = relationship(secondary=submission_files, back_populates="files")
-    reviews: Mapped[list[AssignmentReview]] = relationship(secondary=review_files, back_populates="files")
+    homeworks: Mapped[list[Homework]] = relationship(secondary=homework_attachments, back_populates="attachments")
+    homework_submissions: Mapped[list[HomeworkSubmission]] = relationship(secondary=homework_submission_attachments, back_populates="attachments")
 
 
 class Conversation(TimestampMixin, Base):

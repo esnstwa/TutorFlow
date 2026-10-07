@@ -1,21 +1,37 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import date
 from typing import Any
+from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from sqlalchemy import func, select
+from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.auth import get_current_teacher
+from app.core.auth import get_current_student, get_current_teacher
 from app.core.database import get_db
+from app.homework.schemas import HomeworkCreate, HomeworkReviewCreate, HomeworkSubmissionCreate
+from app.homework.service import (
+    create_homework,
+    homework_dict,
+    local_aware,
+    recipient_dict,
+    review_homework,
+    search_students,
+    student_recipient,
+    student_recipients,
+    submit_homework,
+    teacher_homework,
+    teacher_homeworks,
+    teacher_recipient,
+)
 from app.integrations.google_calendar import google_calendar
-from app.models import Assignment, AssignmentReview, AssignmentSubmission, Conversation, FileResource, Lesson, Student, User
+from app.models import Conversation, FileResource, Homework, HomeworkRecipient, HomeworkSubmission, Lesson, Student, User
 from app.services import (
-    ASSIGNMENT_STATUSES,
     LESSON_STATUSES,
     assignment_dict,
     cabinet_data,
@@ -25,10 +41,8 @@ from app.services import (
     lesson_dict,
     local_datetime,
     material_from_label,
-    review_dict,
     scoped_assignment,
     scoped_lesson,
-    scoped_review,
     scoped_student,
     scoped_submission,
     student_dict,
@@ -63,6 +77,11 @@ def render_teacher(request: Request, template: str, *, section: str, db: Session
     return templates.TemplateResponse(request=request, name=template, context=data)
 
 
+def render_student(request: Request, template: str, *, student: Student, **context: Any):
+    data = {"student": student_dict(student), **context}
+    return templates.TemplateResponse(request=request, name=template, context=data)
+
+
 @router.get("/dashboard", response_class=HTMLResponse, name="dashboard")
 def dashboard(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     return render_teacher(request, "pages/dashboard.html", section="dashboard", db=db, teacher=teacher)
@@ -88,7 +107,8 @@ def student_profile(request: Request, student_id: int, db: Session = Depends(get
 
 @router.get("/assignments", response_class=HTMLResponse, name="assignments")
 def assignments(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    return render_teacher(request, "pages/assignments.html", section="assignments", db=db, teacher=teacher)
+    rows = [homework_dict(item) for item in teacher_homeworks(db, teacher.id)]
+    return render_teacher(request, "pages/assignments.html", section="assignments", db=db, teacher=teacher, assignments=rows)
 
 
 @router.get("/assignments/{assignment_id}", response_class=HTMLResponse, name="assignment")
@@ -96,7 +116,7 @@ def assignment(request: Request, assignment_id: int, db: Session = Depends(get_d
     item = scoped_assignment(db, teacher.id, assignment_id)
     if not item:
         raise HTTPException(status_code=404, detail="Задание не найдено")
-    return render_teacher(request, "pages/assignment.html", section="assignments", db=db, teacher=teacher, assignment=assignment_dict(item))
+    return render_teacher(request, "pages/assignment.html", section="assignments", db=db, teacher=teacher, assignment=homework_dict(item))
 
 
 @router.get("/materials", response_class=HTMLResponse, name="materials")
@@ -126,8 +146,41 @@ def notifications(request: Request, db: Session = Depends(get_db), teacher: User
 def submission(request: Request, submission_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     item = scoped_submission(db, teacher.id, submission_id)
     if not item:
+        legacy_submission = db.get(HomeworkSubmission, submission_id)
+        if legacy_submission:
+            item = teacher_recipient(db, teacher.id, legacy_submission.homework_recipient_id)
+    if not item:
         raise HTTPException(status_code=404, detail="Работа не найдена")
     return render_teacher(request, "pages/submission.html", section="assignments", db=db, teacher=teacher, submission=submission_dict(item))
+
+
+@router.get("/homework-recipients/{recipient_id}", response_class=HTMLResponse, name="homework_recipient")
+def homework_recipient_page(request: Request, recipient_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    item = teacher_recipient(db, teacher.id, recipient_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Работа не найдена")
+    return render_teacher(request, "pages/submission.html", section="assignments", db=db, teacher=teacher, submission=submission_dict(item))
+
+
+@router.get("/student/homework", response_class=HTMLResponse, name="student_homework_list")
+def student_homework_list(request: Request, db: Session = Depends(get_db), student: Student = Depends(get_current_student)):
+    rows = []
+    for item in student_recipients(db, student.id):
+        row = recipient_dict(item)
+        row["homework"] = homework_dict(item.homework, include_recipients=False)
+        rows.append(row)
+    return render_student(request, "pages/student_homeworks.html", student=student, assignments=rows)
+
+
+@router.get("/student/homework/{recipient_id}", response_class=HTMLResponse, name="student_homework")
+def student_homework_page(request: Request, recipient_id: int, db: Session = Depends(get_db), student: Student = Depends(get_current_student)):
+    item = student_recipient(db, student.id, recipient_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    row = recipient_dict(item, include_history=True)
+    row["homework"] = homework_dict(item.homework, include_recipients=False)
+    row["teacher"] = {"name": f"{item.homework.teacher.first_name} {item.homework.teacher.last_name}".strip()}
+    return render_student(request, "pages/student_homework.html", student=student, recipient=row)
 
 
 @router.get("/messages/{dialog_id}", response_class=HTMLResponse, name="dialog")
@@ -231,6 +284,11 @@ def list_students(db: Session = Depends(get_db), teacher: User = Depends(get_cur
     return {"ok": True, "students": [student_dict(item) for item in rows]}
 
 
+@router.get("/api/students/search")
+def search_students_api(q: str = Query("", max_length=120), db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    return {"ok": True, "students": [student_dict(item) for item in search_students(db, teacher.id, q)]}
+
+
 @router.get("/api/students/{student_id}")
 def get_student_api(student_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     item = scoped_student(db, teacher.id, student_id)
@@ -304,52 +362,81 @@ async def create_lesson(request: Request, db: Session = Depends(get_db), teacher
     return {"ok": True, "lesson": entity}
 
 
+@router.get("/api/homework")
 @router.get("/api/assignments")
-def list_assignments(db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    rows = db.scalars(select(Assignment).options(selectinload(Assignment.student), selectinload(Assignment.materials)).where(Assignment.teacher_id == teacher.id))
-    return {"ok": True, "assignments": [assignment_dict(item) for item in rows]}
+def list_homework_api(status: str | None = Query(None), q: str = Query("", max_length=200), db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    rows = [homework_dict(item) for item in teacher_homeworks(db, teacher.id)]
+    needle = q.strip().casefold()
+    if needle:
+        rows = [row for row in rows if needle in f"{row['title']} {row['description']}".casefold()]
+    if status == "waiting":
+        rows = [row for row in rows if row["counts"]["ASSIGNED"] or row["counts"]["REVISION_REQUIRED"] or row["counts"]["OVERDUE"]]
+    elif status == "review":
+        rows = [row for row in rows if row["counts"]["SUBMITTED"]]
+    elif status == "completed":
+        rows = [row for row in rows if row["recipient_count"] and row["counts"]["COMPLETED"] == row["recipient_count"]]
+    return {"ok": True, "homeworks": rows, "assignments": rows}
 
 
-@router.get("/api/assignments/{assignment_id}")
-def get_assignment_api(assignment_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    item = scoped_assignment(db, teacher.id, assignment_id)
+@router.get("/api/homework/{homework_id}")
+@router.get("/api/assignments/{homework_id}")
+def get_homework_api(homework_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    item = teacher_homework(db, teacher.id, homework_id)
     if not item:
         raise HTTPException(status_code=404, detail="Задание не найдено")
-    return {"ok": True, "assignment": assignment_dict(item)}
+    row = homework_dict(item)
+    return {"ok": True, "homework": row, "assignment": row}
 
 
+@router.get("/api/homework/{homework_id}/recipients")
+def list_homework_recipients(homework_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    item = teacher_homework(db, teacher.id, homework_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    return {"ok": True, "recipients": [recipient_dict(row, include_history=True) for row in item.recipients]}
+
+
+@router.post("/api/homework")
 @router.post("/api/assignments")
-async def create_assignment(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    payload = payload_dict(await request.json())
+async def create_homework_api(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     try:
-        entity = create_entity(db, teacher, "assignment", payload)
-        commit_or_422(db)
-    except (KeyError, ValueError) as error:
+        data = HomeworkCreate.model_validate(payload_dict(await request.json()))
+        item = create_homework(db, teacher, data)
+    except (ValidationError, ValueError) as error:
         db.rollback()
-        raise HTTPException(status_code=422, detail=str(error)) from error
-    return {"ok": True, "assignment": entity}
+        detail = error.errors()[0]["msg"] if isinstance(error, ValidationError) else str(error)
+        raise HTTPException(status_code=422, detail=detail) from error
+    row = homework_dict(item)
+    return {"ok": True, "homework": row, "assignment": row}
 
 
-@router.patch("/api/assignments/{assignment_id}")
-async def update_assignment(request: Request, assignment_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    item = scoped_assignment(db, teacher.id, assignment_id)
+@router.patch("/api/homework/{homework_id}")
+@router.patch("/api/assignments/{homework_id}")
+async def update_homework_api(request: Request, homework_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    item = teacher_homework(db, teacher.id, homework_id)
     if not item:
         raise HTTPException(status_code=404, detail="Задание не найдено")
     payload = payload_dict(await request.json())
-    if "status" in payload and payload["status"] not in ASSIGNMENT_STATUSES:
-        raise HTTPException(status_code=422, detail="Неизвестный статус задания")
-    for field in ("title", "description", "subject", "status"):
-        if field in payload:
-            setattr(item, field, str(payload[field]).strip())
+    if "title" in payload:
+        title = str(payload["title"]).strip()
+        if not title:
+            raise HTTPException(status_code=422, detail="Укажите название")
+        item.title = title
+    if "description" in payload:
+        item.description = str(payload["description"]).strip()
     if "due_at" in payload:
-        item.due_at = datetime.fromisoformat(str(payload["due_at"]))
+        parsed = HomeworkCreate.model_validate({"title": item.title, "description": item.description or "content", "recipient_ids": [item.recipients[0].student_id], "due_at": payload["due_at"]}).due_at
+        item.due_at = local_aware(parsed)
+    if not item.description and not item.attachments:
+        raise HTTPException(status_code=422, detail="Добавьте описание или хотя бы один файл")
     commit_or_422(db)
-    return {"ok": True, "assignment": assignment_dict(item)}
+    return {"ok": True, "homework": homework_dict(teacher_homework(db, teacher.id, item.id))}
 
 
-@router.delete("/api/assignments/{assignment_id}")
-def delete_assignment(assignment_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    item = scoped_assignment(db, teacher.id, assignment_id)
+@router.delete("/api/homework/{homework_id}")
+@router.delete("/api/assignments/{homework_id}")
+def delete_homework_api(homework_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    item = teacher_homework(db, teacher.id, homework_id)
     if not item:
         raise HTTPException(status_code=404, detail="Задание не найдено")
     db.delete(item)
@@ -357,47 +444,65 @@ def delete_assignment(assignment_id: int, db: Session = Depends(get_db), teacher
     return {"ok": True}
 
 
-@router.post("/api/assignments/{assignment_id}/submissions")
-async def create_submission(request: Request, assignment_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    assignment = scoped_assignment(db, teacher.id, assignment_id)
-    if not assignment:
-        raise HTTPException(status_code=404, detail="Задание не найдено")
-    payload = payload_dict(await request.json())
-    attempt = db.scalar(select(func.max(AssignmentSubmission.attempt_number)).where(AssignmentSubmission.assignment_id == assignment.id)) or 0
-    item = AssignmentSubmission(assignment_id=assignment.id, student_id=assignment.student_id, attempt_number=attempt + 1, comment=str(payload.get("comment", "")), status="submitted")
-    file_ids = [int(value) for value in payload.get("file_ids", [])]
-    if file_ids:
-        files = list(db.scalars(select(FileResource).where(FileResource.owner_id == teacher.id, FileResource.id.in_(file_ids))))
-        if len(files) != len(set(file_ids)):
-            raise HTTPException(status_code=404, detail="Файл не найден")
-        item.files = files
-    assignment.status = "submitted"
-    db.add(item)
-    commit_or_422(db)
-    return {"ok": True, "submission": submission_dict(scoped_submission(db, teacher.id, item.id))}
-
-
-@router.post("/api/submissions/{submission_id}/reviews")
-async def create_review(request: Request, submission_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    submission = scoped_submission(db, teacher.id, submission_id)
-    if not submission:
+@router.get("/api/homework-recipients/{recipient_id}")
+def get_teacher_recipient_api(recipient_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    item = teacher_recipient(db, teacher.id, recipient_id)
+    if not item:
         raise HTTPException(status_code=404, detail="Работа не найдена")
-    payload = payload_dict(await request.json())
-    result = str(payload.get("result", ""))
-    if result not in {"accepted", "revision_requested"}:
-        raise HTTPException(status_code=422, detail="Некорректный результат проверки")
-    score = payload.get("score")
-    max_score = payload.get("max_score")
-    if score is not None and int(score) < 0:
-        raise HTTPException(status_code=422, detail="Оценка не может быть отрицательной")
-    if score is not None and max_score is not None and int(score) > int(max_score):
-        raise HTTPException(status_code=422, detail="Оценка превышает максимум")
-    review = AssignmentReview(submission_id=submission.id, teacher_id=teacher.id, result=result, score=int(score) if score is not None else None, max_score=int(max_score) if max_score is not None else None, comment=str(payload.get("comment", "")))
-    submission.status = "reviewed" if result == "accepted" else "revision_requested"
-    submission.assignment.status = submission.status
-    db.add(review)
-    commit_or_422(db)
-    return {"ok": True, "review": review_dict(review)}
+    row = recipient_dict(item, include_history=True)
+    row["homework"] = homework_dict(item.homework, include_recipients=False)
+    return {"ok": True, "recipient": row}
+
+
+@router.post("/api/homework-recipients/{recipient_id}/reviews")
+@router.post("/api/submissions/{recipient_id}/reviews")
+async def review_homework_api(request: Request, recipient_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    item = teacher_recipient(db, teacher.id, recipient_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Работа не найдена")
+    try:
+        data = HomeworkReviewCreate.model_validate(payload_dict(await request.json()))
+        updated = review_homework(db, teacher, item, data)
+    except (ValidationError, ValueError, PermissionError) as error:
+        db.rollback()
+        detail = error.errors()[0]["msg"] if isinstance(error, ValidationError) else str(error)
+        raise HTTPException(status_code=422, detail=detail) from error
+    return {"ok": True, "recipient": recipient_dict(updated, include_history=True)}
+
+
+@router.get("/api/student/homework")
+def list_student_homework_api(db: Session = Depends(get_db), student: Student = Depends(get_current_student)):
+    rows = []
+    for item in student_recipients(db, student.id):
+        row = recipient_dict(item)
+        row["homework"] = homework_dict(item.homework, include_recipients=False)
+        rows.append(row)
+    return {"ok": True, "assignments": rows}
+
+
+@router.get("/api/student/homework/{recipient_id}")
+def get_student_homework_api(recipient_id: int, db: Session = Depends(get_db), student: Student = Depends(get_current_student)):
+    item = student_recipient(db, student.id, recipient_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    row = recipient_dict(item, include_history=True)
+    row["homework"] = homework_dict(item.homework, include_recipients=False)
+    return {"ok": True, "recipient": row}
+
+
+@router.post("/api/student/homework/{recipient_id}/submissions")
+async def submit_student_homework_api(request: Request, recipient_id: int, db: Session = Depends(get_db), student: Student = Depends(get_current_student)):
+    item = student_recipient(db, student.id, recipient_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    try:
+        data = HomeworkSubmissionCreate.model_validate(payload_dict(await request.json()))
+        updated = submit_homework(db, student, item, data)
+    except (ValidationError, ValueError, PermissionError) as error:
+        db.rollback()
+        detail = error.errors()[0]["msg"] if isinstance(error, ValidationError) else str(error)
+        raise HTTPException(status_code=422, detail=detail) from error
+    return {"ok": True, "recipient": recipient_dict(updated, include_history=True)}
 
 
 @router.get("/api/materials")
@@ -425,7 +530,7 @@ async def create_material(request: Request, db: Session = Depends(get_db), teach
 
 @router.post("/api/files/upload")
 async def upload_file(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    original_name = request.headers.get("X-Filename", "").strip()
+    original_name = unquote(request.headers.get("X-Filename", "").strip())
     if not original_name:
         raise HTTPException(status_code=422, detail="Передайте имя файла в X-Filename")
     content = await request.body()
@@ -435,6 +540,40 @@ async def upload_file(request: Request, db: Session = Depends(get_db), teacher: 
     try:
         stored_name, storage_path = store_bytes(original_name, content)
         item = FileResource(owner_id=teacher.id, original_name=original_name, stored_name=stored_name, storage_path=storage_path, mime_type=request.headers.get("Content-Type"), size=len(content), title=request.headers.get("X-Title", original_name), kind=request.headers.get("X-File-Kind", "Файл"))
+        db.add(item)
+        commit_or_422(db)
+        return {"ok": True, "file": file_dict(item)}
+    except Exception:
+        db.rollback()
+        if storage_path:
+            staged = stage_deletion(storage_path)
+            finish_staged_deletion(staged)
+        raise
+
+
+@router.post("/api/student/files/upload")
+async def upload_student_file(request: Request, db: Session = Depends(get_db), student: Student = Depends(get_current_student)):
+    if not student.user_id:
+        raise HTTPException(status_code=422, detail="Профиль ученика не связан с аккаунтом")
+    original_name = unquote(request.headers.get("X-Filename", "").strip())
+    if not original_name:
+        raise HTTPException(status_code=422, detail="Передайте имя файла в X-Filename")
+    content = await request.body()
+    if not content:
+        raise HTTPException(status_code=422, detail="Файл пуст")
+    storage_path = None
+    try:
+        stored_name, storage_path = store_bytes(original_name, content)
+        item = FileResource(
+            owner_id=student.user_id,
+            original_name=original_name,
+            stored_name=stored_name,
+            storage_path=storage_path,
+            mime_type=request.headers.get("Content-Type"),
+            size=len(content),
+            title=request.headers.get("X-Title", original_name),
+            kind=request.headers.get("X-File-Kind", "Файл"),
+        )
         db.add(item)
         commit_or_422(db)
         return {"ok": True, "file": file_dict(item)}
@@ -480,11 +619,9 @@ def attachment_owner(db: Session, teacher: User, resource: str, resource_id: int
     if resource == "lessons":
         return scoped_lesson(db, teacher.id, resource_id), "materials"
     if resource == "assignments":
-        return scoped_assignment(db, teacher.id, resource_id), "materials"
-    if resource == "submissions":
-        return scoped_submission(db, teacher.id, resource_id), "files"
-    if resource == "reviews":
-        return scoped_review(db, teacher.id, resource_id), "files"
+        return scoped_assignment(db, teacher.id, resource_id), "attachments"
+    if resource == "homework":
+        return scoped_assignment(db, teacher.id, resource_id), "attachments"
     raise HTTPException(status_code=404, detail="Неизвестный ресурс")
 
 
