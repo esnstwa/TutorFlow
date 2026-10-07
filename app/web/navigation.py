@@ -6,6 +6,14 @@ _AUTH_ROUTE_NAMES = {
     "register": "auth_register",
 }
 
+TEACHER_NAVIGATION = (
+    ("dashboard", "home", "Главная"),
+    ("schedule", "calendar", "Расписание"),
+    ("students", "users", "Ученики"),
+    ("assignments", "assignment", "Задания"),
+    ("materials", "folder", "Материалы"),
+)
+
 
 def get_auth_navigation(request: Request) -> dict[str, str | None]:
     """Resolve optional auth links without exposing routes that do not exist yet."""

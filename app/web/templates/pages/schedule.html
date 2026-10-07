@@ -1,0 +1,121 @@
+{% extends "teacher_layout.html" %}
+
+{% block teacher_title %}Расписание{% endblock %}
+{% block teacher_header %}
+<div class="dashboard-page-heading schedule-page-heading">
+  <h1>Расписание</h1>
+  <p>Ваши занятия, задания и другие события в одном календаре.</p>
+</div>
+<button class="dashboard-primary schedule-create-button" type="button" data-open-modal="lesson">{{ icon('plus') }}Создать занятие</button>
+{% endblock %}
+
+{% block teacher_content %}
+<div class="schedule-page" data-schedule-root data-today="{{ calendar_today }}" data-current-time="{{ calendar_time }}">
+  <section class="schedule-calendar-card" aria-label="Календарь занятий">
+    <div class="schedule-toolbar">
+      <div class="schedule-period-controls">
+        <button type="button" class="schedule-icon-button" data-calendar-prev aria-label="Предыдущий период">{{ icon('chevron', 'is-back') }}</button>
+        <button type="button" class="schedule-today-button" data-calendar-today>Сегодня</button>
+        <button type="button" class="schedule-icon-button" data-calendar-next aria-label="Следующий период">{{ icon('chevron') }}</button>
+        <strong class="schedule-period-label" data-period-label></strong>
+      </div>
+      <div class="schedule-view-switch" role="group" aria-label="Вид календаря">
+        <button type="button" data-calendar-view="day" aria-pressed="false">День</button>
+        <button type="button" class="is-active" data-calendar-view="week" aria-pressed="true">Неделя</button>
+        <button type="button" data-calendar-view="month" aria-pressed="false">Месяц</button>
+      </div>
+    </div>
+    <div class="schedule-canvas-wrap">
+      <div class="schedule-canvas" data-calendar-canvas aria-live="polite"></div>
+    </div>
+  </section>
+
+  <aside class="schedule-sidebar" aria-label="Настройки календаря">
+    <section class="schedule-side-card schedule-mini-calendar">
+      <div class="schedule-side-heading"><h2 data-mini-title></h2><div><button type="button" data-mini-prev aria-label="Предыдущий месяц">{{ icon('chevron', 'is-back') }}</button><button type="button" data-mini-next aria-label="Следующий месяц">{{ icon('chevron') }}</button></div></div>
+      <div class="schedule-mini-weekdays" aria-hidden="true"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+      <div class="schedule-mini-grid" data-mini-grid></div>
+    </section>
+
+    <section class="schedule-side-card schedule-calendars">
+      <h2>Мои календари</h2>
+      <label><input type="checkbox" value="lessons" data-calendar-filter checked><span class="schedule-check schedule-check--lessons">{{ icon('check') }}</span><span>Занятия TutorFlow</span></label>
+      <label><input type="checkbox" value="reviews" data-calendar-filter checked><span class="schedule-check schedule-check--reviews">{{ icon('check') }}</span><span>Проверка заданий</span></label>
+      <label><input type="checkbox" value="personal" data-calendar-filter checked><span class="schedule-check schedule-check--personal">{{ icon('check') }}</span><span>Личные дела</span></label>
+      <label><input type="checkbox" value="google" data-calendar-filter checked><span class="schedule-check schedule-check--google">{{ icon('check') }}</span><span>Google Calendar</span><span class="schedule-google-mark" aria-hidden="true">G</span></label>
+    </section>
+
+    <section class="schedule-side-card schedule-google-card" data-google-status="{{ 'connected' if google_calendar.connected else 'disconnected' }}">
+      {% if google_calendar.connected %}
+      <div class="schedule-google-heading"><span class="schedule-google-logo">G</span><div><h2>Google Calendar</h2><span class="schedule-connected">Подключен</span></div></div>
+      <label class="schedule-google-toggle"><span>Показывать события Google Calendar</span><input type="checkbox" {% if google_calendar.events_visible %}checked{% endif %}></label>
+      <button type="button" class="schedule-sync-button" {% if not google_calendar.can_sync %}disabled{% endif %}>{{ icon('sync') }}Синхронизировать</button>
+      {% else %}
+      <div class="schedule-google-heading"><span class="schedule-google-logo">G</span><div><h2>Google Calendar</h2><p>Синхронизируйте внешние события с TutorFlow</p></div></div>
+      <button type="button" class="dashboard-secondary schedule-connect-button" data-google-connect>Подключить</button>
+      <p class="schedule-integration-note" data-google-note hidden>Подключение появится после настройки OAuth.</p>
+      {% endif %}
+    </section>
+  </aside>
+
+  <dialog class="schedule-lesson-dialog" data-lesson-dialog aria-labelledby="lesson-dialog-title">
+    <form class="schedule-lesson-modal" data-lesson-form>
+      <header class="schedule-lesson-header">
+        <div>
+          <span class="schedule-lesson-kicker">Занятие</span>
+          <h2 id="lesson-dialog-title">Информация о занятии</h2>
+        </div>
+        <button type="button" class="schedule-lesson-close" data-lesson-close aria-label="Закрыть">{{ icon('close') }}</button>
+      </header>
+
+      <div class="schedule-lesson-scroll">
+        <section class="schedule-lesson-summary" aria-label="Ученик и время занятия">
+          <div class="schedule-lesson-student">
+            <span class="schedule-lesson-avatar" data-lesson-avatar aria-hidden="true"></span>
+            <div><strong data-lesson-student></strong><span data-lesson-meta></span></div>
+          </div>
+          <div class="schedule-lesson-datetime">
+            <span>{{ icon('calendar') }}<span data-lesson-date></span></span>
+            <span>{{ icon('clock') }}<span data-lesson-time></span></span>
+          </div>
+        </section>
+
+        <fieldset class="schedule-lesson-section schedule-status-fieldset">
+          <legend>Статус занятия</legend>
+          <div class="schedule-status-options">
+            <label class="schedule-status-option schedule-status-option--scheduled"><input type="radio" name="status" value="scheduled"><span class="schedule-status-dot"></span><span>Запланировано</span></label>
+            <label class="schedule-status-option schedule-status-option--unpaid"><input type="radio" name="status" value="completed_unpaid"><span class="schedule-status-dot"></span><span>Проведено и неоплачено</span></label>
+            <label class="schedule-status-option schedule-status-option--paid"><input type="radio" name="status" value="completed_paid"><span class="schedule-status-dot"></span><span>Проведено и оплачено</span></label>
+            <label class="schedule-status-option schedule-status-option--cancelled"><input type="radio" name="status" value="cancelled"><span class="schedule-status-dot"></span><span>Отменено</span></label>
+          </div>
+        </fieldset>
+
+        <section class="schedule-lesson-section">
+          <h3>Информация</h3>
+          <label class="schedule-lesson-field"><span>Тема занятия</span><input type="text" name="topic" maxlength="200" required></label>
+          <label class="schedule-lesson-field"><span>Место проведения или ссылка</span><input type="text" name="location" maxlength="300" placeholder="Например, Google Meet или адрес"></label>
+          <div class="schedule-materials-heading"><span>Материалы занятия</span><button type="button" data-material-add>{{ icon('plus') }}Добавить материал</button></div>
+          <div class="schedule-material-list" data-material-list></div>
+        </section>
+
+        <section class="schedule-lesson-section">
+          <label class="schedule-note-heading" for="lesson-note"><span><strong>Заметка для себя</strong><small>Приватная заметка — ученик её не увидит</small></span><output data-note-count>0 / 500</output></label>
+          <textarea id="lesson-note" name="teacher_note" maxlength="500" rows="4" placeholder="Что важно помнить об этом занятии"></textarea>
+        </section>
+        <p class="schedule-lesson-error" data-lesson-error role="alert" hidden></p>
+      </div>
+
+      <footer class="schedule-lesson-actions">
+        <button type="button" class="schedule-delete-action" data-lesson-delete>Удалить занятие</button>
+        <div><button type="button" class="dashboard-secondary" data-lesson-close>Закрыть</button><button type="submit" class="dashboard-primary" data-lesson-save>Сохранить изменения</button></div>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="schedule-event-dialog" data-event-dialog aria-labelledby="event-dialog-title">
+    <div class="schedule-event-dialog-card"><button type="button" data-event-close aria-label="Закрыть">{{ icon('close') }}</button><span class="schedule-event-kind" data-event-kind></span><h2 id="event-dialog-title" data-event-title></h2><p data-event-subtitle></p><time data-event-time></time></div>
+  </dialog>
+
+  <script type="application/json" data-calendar-events>{{ calendar_events|tojson }}</script>
+</div>
+{% endblock %}
