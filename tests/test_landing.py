@@ -19,7 +19,7 @@ def test_landing_page() -> None:
     assert "Получил." in response.text
     assert "Комментарии" in response.text
     assert "augustin-focused.webp" in response.text
-    assert "augustin-thinking.png" not in response.text
+    assert "augustin-thinking.webp" not in response.text
     assert "feature-element-set--confused" not in response.text
 
 
@@ -30,22 +30,17 @@ def test_design_tokens_are_served() -> None:
     assert "text/css" in response.headers["content-type"]
 
 
-def test_augustin_neutral_asset_is_served() -> None:
-    response = client.get("/static/images/augustin/augustin-neutral.png")
-
-    assert response.status_code == 200
-    assert "image/png" in response.headers["content-type"]
-
-
-def test_augustin_focused_asset_is_served() -> None:
-    response = client.get("/static/images/augustin/augustin-focused.png")
-
-    assert response.status_code == 200
-    assert "image/png" in response.headers["content-type"]
-
-
-def test_optimized_augustin_assets_are_served() -> None:
-    for emotion in ("neutral", "confused", "focused", "excited", "happy"):
+def test_augustin_assets_are_served_as_webp() -> None:
+    for emotion in (
+        "neutral",
+        "confused",
+        "focused",
+        "excited",
+        "happy",
+        "thinking",
+        "eyes-closed",
+        "peeking",
+    ):
         response = client.get(f"/static/images/augustin/augustin-{emotion}.webp")
 
         assert response.status_code == 200

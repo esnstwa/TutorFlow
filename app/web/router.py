@@ -520,5 +520,27 @@ def logout():
 
 
 @router.get("/", response_class=HTMLResponse, name="landing")
-def landing(request: Request):
-    return templates.TemplateResponse(request=request, name="pages/landing.html", context={"navigation": get_auth_navigation(request)})
+async def landing(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/landing.html",
+        context={"navigation": get_auth_navigation(request)},
+    )
+
+
+@router.get("/login", response_class=HTMLResponse, name="auth_login")
+async def login(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/login.html",
+        context={"navigation": get_auth_navigation(request)},
+    )
+
+
+@router.get("/register", response_class=HTMLResponse, name="auth_register")
+async def register(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pages/register.html",
+        context={"navigation": get_auth_navigation(request)},
+    )

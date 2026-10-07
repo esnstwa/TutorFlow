@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Регистрация — TutorFlow{% endblock %}
+
+{% block styles %}
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/login.css') }}?v={{ static_version('css/login.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/register.css') }}?v={{ static_version('css/register.css') }}">
+{% endblock %}
+
+{% block head %}
+  <link rel="preload" as="image" type="image/png" href="{{ url_for('static', path='/images/registration/teacher.png') }}">
+  <link rel="preload" as="image" type="image/png" href="{{ url_for('static', path='/images/registration/student.png') }}">
+{% endblock %}
+
+{% block content %}
+  <div class="register-page">
+    <header class="register-header">
+      <a class="register-wordmark" href="{{ url_for('landing') }}" aria-label="TutorFlow — главная">
+        <span>Tutor</span><em>Flow</em>
+      </a>
+    </header>
+
+    <main class="register-main">
+      <nav class="register-progress" aria-label="Прогресс регистрации">
+        <ol>
+          <li class="is-active" aria-current="step" data-register-progress="1">
+            <span>1</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li data-register-progress="2">
+            <span>2</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li data-register-progress="3">
+            <span>3</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li data-register-progress="4">
+            <span>4</span>
+            <svg class="register-progress__connector" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20 C18 20 26 6 50 6 C74 6 82 20 100 20" /></svg>
+          </li>
+          <li data-register-progress="5">
+            <span>5</span>
+            <svg class="register-progress__flag" viewBox="0 0 36 52" aria-hidden="true">
+              <path d="M7 48 14 7l17 8-19 9" />
+            </svg>
+          </li>
+        </ol>
+      </nav>
+
+      <div class="register-workspace">
+      <div class="register-step" data-register-step="1">
+      <section class="register-intro" aria-labelledby="register-title">
+        <p class="register-count"><strong>01</strong> / 05</p>
+        <h1 id="register-title">Давайте <em>знакомиться</em><span>.</span></h1>
+        <p class="register-lead">Для начала расскажите, как вы будете использовать TutorFlow.</p>
+      </section>
+
+      <form class="role-form" aria-label="Выбор роли">
+          <fieldset class="role-grid">
+          <legend class="visually-hidden">Как вы будете использовать TutorFlow?</legend>
+
+          <label class="role-card">
+            <input type="radio" name="role" value="teacher" checked>
+            <span class="role-card__surface">
+              <span class="role-card__indicator" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
+              </span>
+              <span class="role-card__image">
+                <img src="{{ url_for('static', path='/images/registration/teacher.png') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
+              </span>
+              <span class="role-card__title">Я преподаватель</span>
+              <span class="role-card__description">Планирую занятия, задания<br>и работу с учениками.</span>
+            </span>
+          </label>
+
+          <label class="role-card">
+            <input type="radio" name="role" value="student">
+            <span class="role-card__surface">
+              <span class="role-card__indicator" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
+              </span>
+              <span class="role-card__image">
+                <img src="{{ url_for('static', path='/images/registration/student.png') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
+              </span>
+              <span class="role-card__title">Я ученик</span>
+              <span class="role-card__description">Учусь, выполняю задания<br>и слежу за своим прогрессом.</span>
+            </span>
+            </label>
+          </fieldset>
+          <button class="login-submit register-continue" type="submit">
+            <span>Продолжить</span>
+            <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14M14 7l5 5-5 5" />
+            </svg>
+          </button>
+        </form>
+      </div>
+
+      <div class="register-step register-step--name" data-register-step="2" hidden>
+        <section class="register-intro register-step--name__count" aria-label="Шаг регистрации">
+          <p class="register-count"><strong>02</strong> / 05</p>
+        </section>
+
+        <div class="register-step--name__body">
+          <section class="register-intro register-step--name__heading" aria-labelledby="register-name-title">
+            <h1 id="register-name-title">Как к вам <em>обращаться?</em></h1>
+            <p class="register-lead">Это имя будут видеть ваши ученики и преподаватели.</p>
+          </section>
+
+          <form class="name-form" data-name-form aria-label="Ваше имя" novalidate>
+            <div class="name-form__content">
+              <div class="name-form__field">
+                <div class="login-field">
+                  <label class="visually-hidden" for="register-name">Ваше имя</label>
+                  <input
+                    id="register-name"
+                    name="name"
+                    type="text"
+                    autocomplete="name"
+                    placeholder="Ваше имя"
+                    aria-describedby="register-name-error"
+                  >
+                </div>
+                <p class="name-form__error" id="register-name-error" data-name-error aria-live="polite" aria-hidden="true"></p>
+              </div>
+              <button class="login-submit register-continue" type="submit">
+                <span>Продолжить</span>
+                <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h14M14 7l5 5-5 5" />
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="register-step register-step--name register-step--email" data-register-step="3" hidden>
+        <section class="register-intro register-step--name__count" aria-label="Шаг регистрации">
+          <p class="register-count"><strong>03</strong> / 05</p>
+        </section>
+
+        <div class="register-step--name__body">
+          <section class="register-intro register-step--name__heading" aria-labelledby="register-email-title">
+            <h1 id="register-email-title">Теперь ваша <em>почта.</em></h1>
+            <p class="register-lead">Она понадобится для входа и важных уведомлений TutorFlow.</p>
+          </section>
+
+          <form class="name-form email-form" data-email-form aria-label="Электронная почта" novalidate>
+            <div class="name-form__content">
+              <div class="name-form__field email-form__field">
+                <div class="login-field">
+                  <input
+                    id="register-email"
+                    name="email"
+                    type="email"
+                    aria-label="Email"
+                    inputmode="email"
+                    autocomplete="email"
+                    maxlength="254"
+                    placeholder="Ваша почта"
+                    aria-describedby="register-email-error"
+                  >
+                </div>
+                <p class="name-form__error" id="register-email-error" data-email-error aria-live="polite" aria-hidden="true"></p>
+              </div>
+              <button class="login-submit register-continue" type="submit">
+                <span>Продолжить</span>
+                <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h14M14 7l5 5-5 5" />
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="register-step register-step--name register-step--password" data-register-step="4" hidden>
+        <section class="register-intro register-step--name__count" aria-label="Шаг регистрации">
+          <p class="register-count"><strong>04</strong> / 05</p>
+        </section>
+
+        <div class="register-step--name__body">
+          <section class="register-intro register-step--name__heading" aria-labelledby="register-password-title">
+            <h1 id="register-password-title">Остался <em>пароль.</em></h1>
+            <p class="register-lead">Придумайте пароль для своего аккаунта.</p>
+          </section>
+
+          <form class="name-form password-form" data-password-form aria-label="Создание пароля" novalidate>
+            <div class="name-form__content">
+              <div class="password-form__fields">
+                <div class="name-form__field">
+                  <div class="login-field login-field--password">
+                    <label class="visually-hidden" for="register-password">Пароль</label>
+                    <input
+                      id="register-password"
+                      name="password"
+                      type="password"
+                      autocomplete="new-password"
+                      placeholder="Пароль"
+                      aria-describedby="register-password-requirements register-password-error"
+                    >
+                    <button
+                      class="password-toggle"
+                      type="button"
+                      data-password-toggle
+                      aria-controls="register-password"
+                      aria-label="Показать пароль"
+                      aria-pressed="false"
+                    >
+                      <svg data-icon-password-visible aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden>
+                        <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      <svg data-icon-password-hidden aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/>
+                        <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/>
+                        <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/>
+                        <path d="m2 2 20 20"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="name-form__error" id="register-password-error" data-password-error aria-live="polite" aria-hidden="true"></p>
+                </div>
+
+                <div class="name-form__field">
+                  <div class="login-field login-field--password">
+                    <label class="visually-hidden" for="register-password-confirmation">Повторите пароль</label>
+                    <input
+                      id="register-password-confirmation"
+                      name="password_confirmation"
+                      type="password"
+                      autocomplete="off"
+                      placeholder="Повторите пароль"
+                      aria-describedby="register-password-confirmation-error"
+                    >
+                    <button
+                      class="password-toggle"
+                      type="button"
+                      data-password-toggle
+                      aria-controls="register-password-confirmation"
+                      aria-label="Показать пароль"
+                      aria-pressed="false"
+                    >
+                      <svg data-icon-password-visible aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden>
+                        <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      <svg data-icon-password-hidden aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/>
+                        <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/>
+                        <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/>
+                        <path d="m2 2 20 20"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="name-form__error" id="register-password-confirmation-error" data-password-confirmation-error aria-live="polite" aria-hidden="true"></p>
+                </div>
+              </div>
+
+              <div class="password-requirements" id="register-password-requirements" aria-live="polite">
+                <span data-password-requirement="length">
+                  <span class="role-card__indicator password-requirements__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
+                  </span>
+                  <span>8+ символов</span>
+                </span>
+                <span class="password-requirements__separator" aria-hidden="true">•</span>
+                <span data-password-requirement="letter">
+                  <span class="role-card__indicator password-requirements__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
+                  </span>
+                  <span>буквы</span>
+                </span>
+                <span class="password-requirements__separator" aria-hidden="true">•</span>
+                <span data-password-requirement="digit">
+                  <span class="role-card__indicator password-requirements__check" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
+                  </span>
+                  <span>цифры</span>
+                </span>
+              </div>
+
+              <button class="login-submit register-continue" type="submit" disabled>
+                <span>Завершить</span>
+                <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h14M14 7l5 5-5 5" />
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      </div>
+
+      <p class="register-login">
+        <span class="register-login__line" aria-hidden="true"></span>
+        <span>Уже есть аккаунт? <a href="{{ navigation.login }}">Войти</a></span>
+        <span class="register-login__line" aria-hidden="true"></span>
+      </p>
+    </main>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='/js/register.js') }}?v={{ static_version('js/register.js') }}" defer></script>
+{% endblock %}

@@ -8,6 +8,7 @@ from app.web.router import router as web_router
 from app.web.templating import STATIC_DIR
 
 mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("application/javascript", ".js")
 
 app = FastAPI(title=settings.app_name)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
