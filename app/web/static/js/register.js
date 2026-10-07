@@ -20,6 +20,12 @@
   const passwordError = document.querySelector("[data-password-error]");
   const passwordConfirmationError = document.querySelector("[data-password-confirmation-error]");
   const passwordSubmit = passwordForm?.querySelector('button[type="submit"]');
+  const registerMain = document.querySelector(".register-main");
+  const loginPrompt = document.querySelector("[data-register-login]");
+  const completeName = document.querySelector("[data-register-complete-name]");
+  const completeDescription = document.querySelector("[data-register-complete-description]");
+  const completeCharacter = document.querySelector("[data-register-complete-character]");
+  const completeLink = document.querySelector("[data-register-complete]");
   const passwordRequirements = new Map(
     [...document.querySelectorAll("[data-password-requirement]")].map(element => [
       element.dataset.passwordRequirement,
@@ -199,9 +205,35 @@
     });
   }
 
+  function syncCompleteStep() {
+    const role = registrationState.role === "student" ? "student" : "teacher";
+    const descriptions = {
+      student: "Теперь занятия, задания и материалы всегда будут под рукой.",
+      teacher: "Теперь можно собрать занятия, учеников и материалы в одном месте.",
+    };
+    const alternativeText = {
+      student: "Августин с рюкзаком и тетрадью",
+      teacher: "Августин в очках, с книгой и указкой",
+    };
+
+    if (registerMain) registerMain.dataset.completeRole = role;
+    if (completeName) completeName.textContent = String(registrationState.name || "").trim();
+    if (completeDescription) completeDescription.textContent = descriptions[role];
+    if (completeCharacter) {
+      completeCharacter.src = completeCharacter.dataset[`${role}Src`];
+      completeCharacter.alt = alternativeText[role];
+    }
+    if (completeLink) completeLink.href = completeLink.dataset[`${role}Href`];
+  }
+
   function showStep(step) {
     registrationState.step = step;
     saveRegistrationState();
+
+    const isCompleteStep = step === 5;
+    registerMain?.classList.toggle("is-complete", isCompleteStep);
+    if (loginPrompt) loginPrompt.hidden = isCompleteStep;
+    if (isCompleteStep) syncCompleteStep();
 
     steps.forEach(element => {
       element.hidden = Number(element.dataset.registerStep) !== step;
@@ -563,6 +595,15 @@
     registrationState.passwordConfirmation = confirmation;
     saveRegistrationState();
     showStep(5);
+  });
+
+  completeLink?.addEventListener("click", () => {
+    try {
+      sessionStorage.removeItem(storageKey);
+      localStorage.setItem("tutorflow.onboardingComplete", "true");
+    } catch {
+      // Navigation still completes when browser storage is unavailable.
+    }
   });
 
   reducedMotion.addEventListener("change", () => {

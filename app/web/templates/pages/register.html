@@ -8,8 +8,10 @@
 {% endblock %}
 
 {% block head %}
-  <link rel="preload" as="image" type="image/png" href="{{ url_for('static', path='/images/registration/teacher.png') }}">
-  <link rel="preload" as="image" type="image/png" href="{{ url_for('static', path='/images/registration/student.png') }}">
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-teacher-role.webp') }}">
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-student-role.webp') }}">
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-teacher-complete.webp') }}">
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-student-complete.webp') }}">
 {% endblock %}
 
 {% block content %}
@@ -67,7 +69,7 @@
                 <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
               </span>
               <span class="role-card__image">
-                <img src="{{ url_for('static', path='/images/registration/teacher.png') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
+                <img src="{{ url_for('static', path='/images/registration/augustin-teacher-role.webp') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
               </span>
               <span class="role-card__title">Я преподаватель</span>
               <span class="role-card__description">Планирую занятия, задания<br>и работу с учениками.</span>
@@ -81,7 +83,7 @@
                 <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.4 3.4 7.7-8" /></svg>
               </span>
               <span class="role-card__image">
-                <img src="{{ url_for('static', path='/images/registration/student.png') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
+                <img src="{{ url_for('static', path='/images/registration/augustin-student-role.webp') }}" width="965" height="724" alt="" aria-hidden="true" fetchpriority="high">
               </span>
               <span class="role-card__title">Я ученик</span>
               <span class="role-card__description">Учусь, выполняю задания<br>и слежу за своим прогрессом.</span>
@@ -291,9 +293,45 @@
           </form>
         </div>
       </div>
+
+      <div class="register-step register-step--complete" data-register-step="5" hidden>
+        <section class="register-intro register-complete__intro" aria-labelledby="register-complete-title">
+          <p class="register-count"><strong>05</strong> / 05</p>
+          <h1 id="register-complete-title">Всё <em>готово</em><span>.</span></h1>
+          <p class="register-complete__account"><strong data-register-complete-name></strong>, ваш аккаунт TutorFlow создан.</p>
+          <p class="register-lead register-complete__description" data-register-complete-description></p>
+        </section>
+
+        <div class="register-complete__content">
+          <div class="register-complete__stage">
+            <img
+              class="register-complete__character"
+              data-register-complete-character
+              src="{{ url_for('static', path='/images/registration/augustin-teacher-complete.webp') }}"
+              data-teacher-src="{{ url_for('static', path='/images/registration/augustin-teacher-complete.webp') }}"
+              data-student-src="{{ url_for('static', path='/images/registration/augustin-student-complete.webp') }}"
+              width="1402"
+              height="1122"
+              alt="Августин с книгой и указкой"
+            >
+          </div>
+          <a
+            class="login-submit register-continue register-complete__button"
+            data-register-complete
+            data-teacher-href="{{ url_for('landing') }}"
+            data-student-href="{{ url_for('landing') }}"
+            href="{{ url_for('landing') }}"
+          >
+            <span>Перейти в TutorFlow</span>
+            <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14M14 7l5 5-5 5" />
+            </svg>
+          </a>
+        </div>
+      </div>
       </div>
 
-      <p class="register-login">
+      <p class="register-login" data-register-login>
         <span class="register-login__line" aria-hidden="true"></span>
         <span>Уже есть аккаунт? <a href="{{ navigation.login }}">Войти</a></span>
         <span class="register-login__line" aria-hidden="true"></span>
