@@ -68,6 +68,7 @@ class Student(TimestampMixin, Base):
     avatar: Mapped[str | None] = mapped_column(String(500))
     grade: Mapped[str] = mapped_column(String(50), nullable=False)
     subject: Mapped[str] = mapped_column(String(120), nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     teacher: Mapped[User] = relationship(back_populates="students", foreign_keys=[teacher_id])
     user: Mapped[User | None] = relationship(back_populates="student_profile", foreign_keys=[user_id])

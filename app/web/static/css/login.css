@@ -1,3 +1,11 @@
+/* Auth feedback is absent from the default layout. */
+.login-error[hidden] { display: none; }
+.login-error { margin: 0; color: #c4314b; font-size: .8rem; line-height: 1.25; }
+.login-link[aria-disabled="true"] { position: relative; cursor: not-allowed; }
+.login-recovery-note { position: absolute; right: 0; top: 100%; width: 15rem; padding: .35rem; background: #fff; font-size: .75rem; visibility: hidden; }
+.login-link[aria-disabled="true"]:hover .login-recovery-note { visibility: visible; }
+.login-submit:disabled { cursor: wait; }
+
 .login-page {
   position: relative;
   min-height: 100svh;

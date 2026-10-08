@@ -1,47 +1,43 @@
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.auth.sessions import resolve_session
+from app.auth.csrf import require_csrf
 from app.core.database import get_db
 from app.models import Student, User
 
 
-def get_current_teacher(request: Request, db: Session = Depends(get_db)) -> User:
-    """Use an upstream authenticated user when present, with a dev-only seed fallback.
+def optional_current_user(request: Request, db: Session = Depends(get_db)) -> User | None:
+    session = resolve_session(request, db)
+    user = db.get(User, session.user_id) if session else None
+    request.state.csrf_token = session.csrf_token if user else None
+    return user
 
-    The project has no authentication routes yet. This dependency is the single
-    integration point for the future auth module and avoids inventing a second
-    login/session implementation in the teacher cabinet.
-    """
-    principal = getattr(request.state, "user", None)
-    if isinstance(principal, User):
-        teacher = db.get(User, principal.id)
-    elif getattr(principal, "id", None):
-        teacher = db.get(User, int(principal.id))
-    elif settings.enable_dev_teacher_fallback:
-        teacher = db.scalar(select(User).where(User.email == settings.dev_teacher_email))
-    else:
-        teacher = None
-    if not teacher or teacher.role != "teacher":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация преподавателя")
-    return teacher
+
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    user = optional_current_user(request, db)
+    if user is None:
+        if not request.url.path.startswith("/api/"):
+            raise HTTPException(status_code=303, detail="Требуется авторизация", headers={"Location": "/login"})
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        require_csrf(request, request.state.csrf_token)
+    return user
+
+
+def get_current_teacher(request: Request, db: Session = Depends(get_db)) -> User:
+    user = get_current_user(request, db)
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Требуется роль преподавателя")
+    return user
 
 
 def get_current_student(request: Request, db: Session = Depends(get_db)) -> Student:
-    """Resolve the authenticated student's profile through the canonical user link."""
-    principal = getattr(request.state, "user", None)
-    if isinstance(principal, User):
-        user = db.get(User, principal.id)
-    elif getattr(principal, "id", None):
-        user = db.get(User, int(principal.id))
-    elif settings.enable_dev_teacher_fallback:
-        user = db.scalar(select(User).where(User.email == settings.dev_student_email))
-    else:
-        user = None
-    if not user or user.role != "student":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация ученика")
+    user = get_current_user(request, db)
+    if user.role != "student":
+        raise HTTPException(status_code=403, detail="Требуется роль ученика")
     student = db.scalar(select(Student).where(Student.user_id == user.id))
-    if not student:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Профиль ученика не найден")
+    if student is None:
+        raise HTTPException(status_code=403, detail="Профиль ученика не найден")
     return student

@@ -1,4 +1,51 @@
 {% extends "teacher_layout.html" %}
-{% block teacher_title %}Ученики{% endblock %}{% block page_heading %}Ученики{% endblock %}{% block page_description %}Список учеников и быстрый доступ к профилям.{% endblock %}
-{% block teacher_content %}<section class="dashboard-card dashboard-page-card"><div class="dashboard-section-toolbar"><h2>Все ученики</h2><button class="dashboard-primary" data-open-modal="student">{{ icon('user-plus') }}Добавить ученика</button></div>
-{% if students %}<div class="dashboard-card-grid">{% for item in students %}<a class="dashboard-person-card" href="{{ url_for('student_profile', student_id=item.id) }}" data-spa><span class="dashboard-avatar dashboard-avatar--student">{{ item.initials }}</span><span><strong>{{ item.name }}</strong><small>{{ item.subject }} · {{ item.grade }}</small></span>{{ icon('chevron') }}</a>{% endfor %}</div>{% else %}<div class="dashboard-empty"><h3>Учеников пока нет</h3><p>Добавьте ученика или отправьте приглашение.</p></div>{% endif %}</section>{% endblock %}
+{% block teacher_title %}Ученики{% endblock %}
+{% block page_heading %}Ученики{% endblock %}
+{% block page_description %}Список учеников и быстрый доступ к профилям.{% endblock %}
+{% block teacher_content %}
+<section class="dashboard-card dashboard-page-card">
+  <div class="dashboard-section-toolbar">
+    <h2>{% if directory_archived == 'archived' %}Архив учеников{% else %}Все ученики{% endif %}</h2>
+    <a class="dashboard-secondary" href="{{ url_for('students') }}?archived={% if directory_archived == 'archived' %}active{% else %}archived{% endif %}" data-spa>{% if directory_archived == 'archived' %}Активные ученики{% else %}Архив{% endif %}</a>
+    <button class="dashboard-primary" data-open-modal="student">{{ icon('user-plus') }}Добавить ученика</button>
+  </div>
+  {% if directory_total %}
+  <form class="student-directory-filters" method="get" action="{{ url_for('students') }}" data-student-directory-form role="search" aria-label="Поиск учеников">
+    <input type="hidden" name="archived" value="{{ directory_archived }}">
+    <label class="student-directory-search">
+      <span>Поиск ученика</span>
+      <input type="search" name="q" value="{{ directory_query }}" maxlength="200" placeholder="Имя, email или класс">
+    </label>
+    <label>
+      <span>Предмет</span>
+      <select name="subject">
+        <option value="">Все предметы</option>
+        {% for subject in directory_subjects %}<option value="{{ subject }}"{% if directory_subject == subject %} selected{% endif %}>{{ subject }}</option>{% endfor %}
+        {% if directory_subject and directory_subject not in directory_subjects %}<option value="{{ directory_subject }}" selected>{{ directory_subject }}</option>{% endif %}
+      </select>
+    </label>
+    <button class="dashboard-primary" type="submit">Найти</button>
+    {% if directory_query or directory_subject %}<a class="dashboard-secondary" href="{{ url_for('students') }}" data-spa>Сбросить</a>{% endif %}
+  </form>
+  <p class="student-directory-count" role="status">Показано {{ directory_students|length }} из {{ directory_total }}</p>
+  {% endif %}
+  {% if directory_students %}
+  <div class="dashboard-card-grid">
+    {% for item in directory_students %}
+    <a class="dashboard-person-card" href="{{ url_for('student_profile', student_id=item.id) }}" data-spa data-directory-student="{{ item.id }}">
+      <span class="dashboard-avatar dashboard-avatar--student">{{ item.initials }}</span>
+      <span><strong>{{ item.name }}</strong><small>{{ item.subject }} · {{ item.grade }}</small><small>{{ item.lifecycle_label }}{% if item.archived %} · В архиве{% endif %}</small></span>
+      {{ icon('chevron') }}
+    </a>
+    {% endfor %}
+  </div>
+  {% elif directory_total %}
+  <div class="dashboard-empty" data-directory-no-results>
+    <h3>Ученики не найдены</h3>
+    <p>Измените запрос или сбросьте фильтры.</p>
+  </div>
+  {% else %}
+  <div class="dashboard-empty"><h3>{% if directory_archived == 'archived' %}Архив пуст{% else %}Учеников пока нет{% endif %}</h3><p>{% if directory_archived == 'archived' %}Архивирование не удаляет учебную историю.{% else %}Добавьте ученика или отправьте приглашение.{% endif %}</p></div>
+  {% endif %}
+</section>
+{% endblock %}

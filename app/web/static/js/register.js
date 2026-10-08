@@ -38,20 +38,30 @@
     role: "teacher",
     name: "",
     email: "",
-    password: "",
-    passwordConfirmation: "",
+    // Passwords live only in the form inputs.
     step: 1,
   };
 
   try {
-    registrationState = { ...registrationState, ...JSON.parse(sessionStorage.getItem(storageKey) || "{}") };
+    const saved = JSON.parse(sessionStorage.getItem(storageKey) || "{}");
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      registrationState.role = ["teacher", "student"].includes(saved.role) ? saved.role : "teacher";
+      registrationState.name = typeof saved.name === "string" ? saved.name : "";
+      registrationState.email = typeof saved.email === "string" ? saved.email.slice(0, maximumEmailLength) : "";
+      registrationState.step = Number.isInteger(saved.step) && saved.step >= 1 && saved.step <= 4 ? saved.step : 1;
+    }
   } catch {
     // Continue with defaults when session storage is unavailable or malformed.
   }
 
+  // Purge old local copies, including legacy plaintext passwords; never touch invite storage.
+  try { localStorage.removeItem(storageKey); } catch { /* Storage may be unavailable. */ }
+  let pending = false;
+  let registered = false;
+
   function saveRegistrationState() {
     try {
-      sessionStorage.setItem(storageKey, JSON.stringify(registrationState));
+      sessionStorage.setItem(storageKey, JSON.stringify({role: registrationState.role, name: registrationState.name, email: registrationState.email, step: Math.min(registrationState.step, 4)}));
     } catch {
       // Browser storage is an enhancement; the current registration still works without it.
     }
@@ -172,7 +182,7 @@
       passwordRequirements.get(name)?.classList.toggle("is-valid", isMet);
     });
 
-    passwordSubmit.disabled = !(
+    passwordSubmit.disabled = pending || registered || !(
       password
       && confirmation
       && Object.values(requirements).every(Boolean)
@@ -199,9 +209,17 @@
     });
   }
 
-  function showStep(step) {
+  function allowedStep(requested) {
+    if (registered) return 5;
+    const maximum = getNameValidationError(registrationState.name) ? 2
+      : getEmailValidationError(registrationState.email) ? 3 : 4;
+    return Math.min(Math.max(Number.isInteger(requested) ? requested : 1, 1), maximum);
+  }
+
+  function showStep(requested, mode = "push") {
+    const step = allowedStep(requested);
     registrationState.step = step;
-    saveRegistrationState();
+    if (!registered) saveRegistrationState();
 
     steps.forEach(element => {
       element.hidden = Number(element.dataset.registerStep) !== step;
@@ -209,7 +227,7 @@
 
     progressItems.forEach(item => {
       const itemStep = Number(item.dataset.registerProgress);
-      const isComplete = itemStep < step;
+      const isComplete = !registered && itemStep < step;
       const node = item.querySelector(":scope > span");
       item.classList.toggle("is-complete", isComplete);
       item.classList.toggle("is-active", itemStep === step);
@@ -237,7 +255,15 @@
       [4, "#step-4"],
       [5, "#step-5"],
     ]);
-    history.replaceState(null, "", stepRoutes.get(step) || `${location.pathname}${location.search}`);
+    const route = stepRoutes.get(step);
+    const currentRoute = stepRoutes.get(hashSteps.get(location.hash) || 1);
+    if (mode === "replace" || (mode === "sync" && (route !== currentRoute || (location.hash && !hashSteps.has(location.hash))))) {
+      history.replaceState(null, "", route);
+    } else if (mode === "push" && route !== currentRoute) {
+      history.pushState(null, "", route);
+    }
+    if (step === 1) roleForm.querySelector('input[name="role"]:checked')?.focus({ preventScroll: true });
+    if (step === 5) document.querySelector("[data-register-success-title]")?.focus({ preventScroll: true });
 
     if (step === 2) nameInput?.focus({ preventScroll: true });
     if (step === 3) emailInput?.focus({ preventScroll: true });
@@ -496,11 +522,10 @@
   });
 
   if (passwordInput && passwordConfirmationInput && passwordError && passwordConfirmationError) {
-    passwordInput.value = String(registrationState.password || "");
-    passwordConfirmationInput.value = String(registrationState.passwordConfirmation || "");
+    passwordInput.value = "";
+    passwordConfirmationInput.value = "";
 
     passwordInput.addEventListener("input", () => {
-      registrationState.password = passwordInput.value;
       setPasswordFieldError(passwordInput, passwordError, "");
       if (passwordConfirmationInput.value) {
         setPasswordFieldError(
@@ -514,7 +539,6 @@
     });
 
     passwordConfirmationInput.addEventListener("input", () => {
-      registrationState.passwordConfirmation = passwordConfirmationInput.value;
       setPasswordFieldError(
         passwordConfirmationInput,
         passwordConfirmationError,
@@ -541,13 +565,13 @@
     updatePasswordForm();
   }
 
-  passwordForm?.addEventListener("submit", event => {
+  passwordForm?.addEventListener("submit", async event => {
     event.preventDefault();
     const password = passwordInput.value;
     const confirmation = passwordConfirmationInput.value;
-    const confirmationValidationError = getPasswordConfirmationError(password, confirmation);
+    const confirmationValidationError = !confirmation ? "Повторите пароль" : getPasswordConfirmationError(password, confirmation);
 
-    setPasswordFieldError(passwordInput, passwordError, "");
+    setPasswordFieldError(passwordInput, passwordError, isPasswordValid(password) ? "" : "Пароль: минимум 8 символов, буквы и цифры");
     setPasswordFieldError(
       passwordConfirmationInput,
       passwordConfirmationError,
@@ -559,10 +583,65 @@
       return;
     }
 
-    registrationState.password = password;
-    registrationState.passwordConfirmation = confirmation;
-    saveRegistrationState();
-    showStep(5);
+    if (pending || registered) return;
+    if (allowedStep(4) !== 4) { showStep(4); return; }
+    const submitted = {
+      first_name: registrationState.name, last_name: "", email: registrationState.email,
+      password, password_confirmation: confirmation, role: registrationState.role,
+    };
+    pending = true;
+    passwordForm.setAttribute("aria-busy", "true");
+    updatePasswordForm();
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST", credentials: "same-origin",
+        headers: {"Content-Type": "application/json", "X-TutorFlow-Request": "auth"},
+        body: JSON.stringify(submitted),
+      });
+      const data = await response.json();
+      if (!response.ok || data.ok !== true) {
+        const fields = data.fields && typeof data.fields === "object" ? data.fields : {};
+        const targets = {
+          first_name: [2, nameInput, nameError], email: [3, emailInput, emailError],
+          password: [4, passwordInput, passwordError],
+          password_confirmation: [4, passwordConfirmationInput, passwordConfirmationError],
+          role: [1, roleForm.querySelector('input[name="role"]:checked'), document.querySelector("[data-role-error]")],
+        };
+        let target = null;
+        for (const [field, message] of Object.entries(fields)) {
+          if (!targets[field] || typeof message !== "string") continue;
+          const [step, input, error] = targets[field];
+          setPasswordFieldError(input, error, message);
+          if (!target || step < target[0]) target = [step, input];
+        }
+        if (response.status === 409 && !target) {
+          showEmailError("Эта почта уже зарегистрирована"); target = [3, emailInput];
+        }
+        if (target) { showStep(target[0]); target[1]?.focus(); }
+        else {
+          showStep(4);
+          setPasswordFieldError(passwordInput, passwordError,
+            typeof data.detail === "string" ? data.detail : "Не удалось создать аккаунт. Попробуйте снова.");
+        }
+        return;
+      }
+      registered = true;
+      try { sessionStorage.removeItem(storageKey); } catch { /* Storage may be unavailable. */ }
+      try { localStorage.removeItem(storageKey); } catch { /* Storage may be unavailable. */ }
+      nameInput.value = emailInput.value = passwordInput.value = passwordConfirmationInput.value = "";
+      registrationState.name = registrationState.email = "";
+      const destination = ["/dashboard", "/student/homework"].includes(data.redirect)
+        ? data.redirect : submitted.role === "student" ? "/student/homework" : "/dashboard";
+      document.querySelector("[data-register-goto]")?.setAttribute("href", destination);
+      showStep(5);
+    } catch {
+      showStep(4);
+      setPasswordFieldError(passwordInput, passwordError, "Проверьте соединение и попробуйте снова.");
+    } finally {
+      pending = false;
+      passwordForm.removeAttribute("aria-busy");
+      updatePasswordForm();
+    }
   });
 
   reducedMotion.addEventListener("change", () => {
@@ -588,5 +667,8 @@
   const storedStep = Number(registrationState.step);
   const initialStep = hashSteps.get(location.hash)
     || (Number.isInteger(storedStep) && storedStep >= 1 && storedStep <= 5 ? storedStep : 1);
-  showStep(initialStep);
+  showStep(initialStep, "replace");
+  const syncRoute = () => showStep(hashSteps.get(location.hash) || 1, "sync");
+  window.addEventListener("popstate", syncRoute);
+  window.addEventListener("hashchange", syncRoute);
 })();

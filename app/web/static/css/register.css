@@ -1,3 +1,10 @@
+/* New final screen and role error only; steps 1–4 keep their geometry. */
+.register-role-error { display: none; }
+.register-role-error.is-visible { display: block; }
+.register-step--success .register-intro { margin-top: 0; }
+.register-success__image { display: block; width: clamp(7rem, 19vh, 12rem); height: auto; margin: 0 auto clamp(.6rem, 2vh, 1rem); object-fit: contain; }
+.register-success__goto { margin: clamp(1.15rem, 3vh, 1.7rem) auto 0; text-decoration: none; }
+
 :root {
   --register-blue: #183cff;
   --register-muted: #66718b;

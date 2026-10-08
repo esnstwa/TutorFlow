@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Приглашение ученика · TutorFlow{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}"><style>[data-invitation-page] [hidden] { display: none !important; }</style>{% endblock %}
+{% block content %}
+<div class="student-shell"><header class="student-header"><a class="dashboard-wordmark" href="/"><span>Tutor</span><em>Flow</em></a></header>
+<main class="student-main"><section class="dashboard-card dashboard-page-card" data-invitation-page>
+  <h1 tabindex="-1">Приглашение ученика</h1>
+  <p>Ссылка привязывает ваш аккаунт ученика к записи у преподавателя. Для подтверждения войдите с почтой, указанной преподавателю.</p>
+  <p data-invite-description role="status">Проверяем приглашение…</p>
+  <p class="dashboard-form-error" data-invite-error role="alert" hidden></p>
+  <div data-invite-auth hidden><a class="dashboard-primary" href="{{ url_for('auth_login') }}">Войти</a> <a class="dashboard-secondary" href="{{ url_for('auth_register') }}">Создать аккаунт</a></div>
+  <button type="button" class="dashboard-primary" data-invite-accept hidden>Принять приглашение</button>
+  <button type="button" class="dashboard-secondary" data-invite-discard hidden>Отказаться от приглашения и вернуться</button>
+  <p>Привязка не происходит автоматически. Доступ появляется только после подтверждения.</p>
+</section></main></div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', path='/js/student-lifecycle.js') }}?v={{ static_version('js/student-lifecycle.js') }}" defer></script>{% endblock %}

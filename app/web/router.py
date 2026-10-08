@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.auth import get_current_student, get_current_teacher
+from app.core.auth import get_current_student, get_current_teacher, get_current_user, optional_current_user
 from app.core.database import get_db
 from app.homework.schemas import HomeworkCreate, HomeworkReviewCreate, HomeworkSubmissionCreate
 from app.homework.service import (
@@ -46,6 +46,7 @@ from app.services import (
     scoped_student,
     scoped_submission,
     student_dict,
+    student_directory,
     submission_dict,
 )
 from app.storage import finish_staged_deletion, restore_staged_file, stage_deletion, store_bytes
@@ -93,8 +94,16 @@ def schedule(request: Request, db: Session = Depends(get_db), teacher: User = De
 
 
 @router.get("/students", response_class=HTMLResponse, name="students")
-def students(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    return render_teacher(request, "pages/students.html", section="students", db=db, teacher=teacher)
+def students(
+    request: Request,
+    q: str = Query("", max_length=200),
+    subject: str = Query("", max_length=120),
+    archived: Literal["active", "archived", "all"] = Query("active"),
+    db: Session = Depends(get_db),
+    teacher: User = Depends(get_current_teacher),
+):
+    directory = student_directory(db, teacher, q, subject, archived)
+    return render_teacher(request, "pages/students.html", section="students", db=db, teacher=teacher, **directory)
 
 
 @router.get("/students/{student_id}", response_class=HTMLResponse, name="student_profile")
@@ -163,7 +172,12 @@ def homework_recipient_page(request: Request, recipient_id: int, db: Session = D
 
 
 @router.get("/student/homework", response_class=HTMLResponse, name="student_homework_list")
-def student_homework_list(request: Request, db: Session = Depends(get_db), student: Student = Depends(get_current_student)):
+def student_homework_list(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if user.role != "student":
+        raise HTTPException(status_code=403, detail="Требуется роль ученика")
+    student = db.scalar(select(Student).where(Student.user_id == user.id))
+    if student is None:
+        return templates.TemplateResponse(request=request, name="pages/student_unlinked.html", context={"student": {"initials": user.first_name[:1]}})
     rows = []
     for item in student_recipients(db, student.id):
         row = recipient_dict(item)
@@ -299,8 +313,8 @@ def get_student_api(student_id: int, db: Session = Depends(get_db), teacher: Use
 
 @router.post("/api/students")
 async def create_student(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    payload = payload_dict(await request.json())
     try:
+        payload = payload_dict(await request.json())
         entity = create_entity(db, teacher, "student", payload)
         commit_or_422(db)
     except (KeyError, ValueError) as error:
@@ -314,15 +328,20 @@ async def update_student(request: Request, student_id: int, db: Session = Depend
     item = scoped_student(db, teacher.id, student_id)
     if not item:
         raise HTTPException(status_code=404, detail="Ученик не найден")
-    payload = payload_dict(await request.json())
-    if "name" in payload:
-        parts = str(payload["name"]).strip().split(maxsplit=1)
-        if not parts:
-            raise HTTPException(status_code=422, detail="Укажите имя")
-        item.first_name, item.last_name = parts[0], parts[1] if len(parts) > 1 else ""
-    for field in ("email", "subject", "grade", "avatar"):
-        if field in payload:
-            setattr(item, field, str(payload[field]).strip() or None if field in ("email", "avatar") else str(payload[field]).strip())
+    from app.students.schemas import validated_fields
+    try:
+        fields = validated_fields(payload_dict(await request.json()), partial=True)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if "email" in fields and fields["email"] != item.email:
+        from sqlalchemy import update
+        from app.models import utc_now
+        from app.students.models import StudentInvitation
+        # Lock/update Student before invitation rows, matching archive and invite order.
+        db.execute(update(Student).where(Student.id == item.id).values(email=fields["email"]))
+        db.execute(update(StudentInvitation).where(StudentInvitation.student_id == item.id, StudentInvitation.consumed_at.is_(None), StudentInvitation.revoked_at.is_(None)).values(revoked_at=utc_now()))
+    for field, value in fields.items():
+        setattr(item, field, value)
     commit_or_422(db)
     return {"ok": True, "student": student_dict(item)}
 
@@ -332,9 +351,9 @@ def delete_student(student_id: int, db: Session = Depends(get_db), teacher: User
     item = scoped_student(db, teacher.id, student_id)
     if not item:
         raise HTTPException(status_code=404, detail="Ученик не найден")
-    db.delete(item)
-    db.commit()
-    return {"ok": True}
+    from app.students.service import archive_student
+    archive_student(db, item)
+    return {"ok": True, "student": student_dict(item)}
 
 
 @router.get("/api/lessons")
@@ -651,9 +670,7 @@ def detach_material(resource: str, resource_id: int, material_id: int, db: Sessi
     return {"ok": True}
 
 
-@router.post("/logout", name="auth_logout")
-def logout():
-    return RedirectResponse(url="/", status_code=303)
+
 
 
 @router.get("/", response_class=HTMLResponse, name="landing")
@@ -665,8 +682,15 @@ async def landing(request: Request):
     )
 
 
+@router.get("/invite", response_class=HTMLResponse, name="student_invite")
+async def student_invite(request: Request, user: User | None = Depends(optional_current_user)):
+    return templates.TemplateResponse(request=request, name="pages/invite.html", context={})
+
+
 @router.get("/login", response_class=HTMLResponse, name="auth_login")
-async def login(request: Request):
+async def login(request: Request, user: User | None = Depends(optional_current_user)):
+    if user is not None:
+        return RedirectResponse("/dashboard" if user.role == "teacher" else "/student/homework", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="pages/login.html",
@@ -675,7 +699,9 @@ async def login(request: Request):
 
 
 @router.get("/register", response_class=HTMLResponse, name="auth_register")
-async def register(request: Request):
+async def register(request: Request, user: User | None = Depends(optional_current_user)):
+    if user is not None:
+        return RedirectResponse("/dashboard" if user.role == "teacher" else "/student/homework", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="pages/register.html",
