@@ -228,6 +228,70 @@
     }, { once: true });
   }
 
+  function initLoginForm() {
+    const form = document.querySelector(".login-form");
+    const email = document.querySelector("#login-email");
+    const password = document.querySelector("#login-password");
+    const submit = form?.querySelector('button[type="submit"]');
+    const error = document.querySelector("[data-login-error]");
+    if (!form || !email || !password || !submit || !error) return;
+    let pending = false;
+    const message = (node, text) => { node.textContent = text; node.hidden = !text; };
+    const fields = [
+      [email, document.querySelector("[data-login-email-error]")],
+      [password, document.querySelector("[data-login-password-error]")],
+    ];
+    fields.forEach(([input, node]) => input.addEventListener("input", () => {
+      input.removeAttribute("aria-invalid");
+      if (node) message(node, "");
+      message(error, "");
+    }));
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (pending) return;
+      message(error, "");
+      if (!email.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim()) || !password.value) {
+        message(error, "Введите корректную почту и пароль");
+        (!email.value.trim() ? email : password).focus();
+        return;
+      }
+      pending = true;
+      submit.disabled = true;
+      form.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch("/api/auth/login", {
+          method: "POST", credentials: "same-origin",
+          headers: {"Content-Type": "application/json", "X-TutorFlow-Request": "auth"},
+          body: JSON.stringify({email: email.value.trim(), password: password.value,
+            remember: Boolean(document.querySelector('[name="remember"]')?.checked)}),
+        });
+        const data = await response.json();
+        if (!response.ok || data.ok !== true) {
+          message(error, response.status === 401 ? "Неверная почта или пароль"
+            : typeof data.detail === "string" ? data.detail : "Не удалось войти. Попробуйте снова.");
+          if (response.status === 422 && data.fields) {
+            fields.forEach(([input, node]) => {
+              const text = data.fields[input === email ? "email" : "password"];
+              if (node && typeof text === "string") { message(node, text); input.setAttribute("aria-invalid", "true"); }
+            });
+          }
+          return;
+        }
+        password.value = "";
+        const destination = ["/dashboard", "/student/homework"].includes(data.redirect)
+          ? data.redirect : data.user?.role === "student" ? "/student/homework" : "/dashboard";
+        location.assign(destination);
+      } catch {
+        message(error, "Проверьте соединение и попробуйте снова.");
+      } finally {
+        pending = false;
+        submit.disabled = false;
+        form.removeAttribute("aria-busy");
+      }
+    });
+  }
+
+  initLoginForm();
   initPasswordToggle();
   initAugustin();
 })();

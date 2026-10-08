@@ -43,3 +43,31 @@ def database_schema() -> Generator[None, None, None]:
         seed_dev_data(db)
     yield
     Base.metadata.drop_all(TEST_ENGINE)
+
+
+@pytest.fixture
+def legacy_cabinet_auth() -> Generator[None, None, None]:
+    """Explicit seeded identities for cabinet/service tests, not auth tests.
+
+    Tests of actual sessions and role isolation must never request this fixture.
+    """
+    from fastapi import Depends
+    from app.core.auth import get_current_student, get_current_teacher
+    from app.models import Student, User
+
+    def teacher(db: Session = Depends(get_db)) -> User:
+        return db.get(User, 1)
+
+    def student(db: Session = Depends(get_db)) -> Student:
+        return db.get(Student, 1)
+
+    previous = {dependency: app.dependency_overrides.get(dependency)
+                for dependency in (get_current_teacher, get_current_student)}
+    app.dependency_overrides[get_current_teacher] = teacher
+    app.dependency_overrides[get_current_student] = student
+    yield
+    for dependency, original in previous.items():
+        if original is None:
+            app.dependency_overrides.pop(dependency, None)
+        else:
+            app.dependency_overrides[dependency] = original

@@ -57,6 +57,7 @@
       </section>
 
       <form class="role-form" aria-label="Выбор роли">
+          <p class="register-role-error name-form__error" data-role-error role="alert" aria-hidden="true"></p>
           <fieldset class="role-grid">
           <legend class="visually-hidden">Как вы будете использовать TutorFlow?</legend>
 
@@ -220,7 +221,7 @@
                       </svg>
                     </button>
                   </div>
-                  <p class="name-form__error" id="register-password-error" data-password-error aria-live="polite" aria-hidden="true"></p>
+                  <p class="name-form__error" id="register-password-error" data-password-error role="alert" aria-live="polite" aria-hidden="true"></p>
                 </div>
 
                 <div class="name-form__field">
@@ -254,7 +255,7 @@
                       </svg>
                     </button>
                   </div>
-                  <p class="name-form__error" id="register-password-confirmation-error" data-password-confirmation-error aria-live="polite" aria-hidden="true"></p>
+                  <p class="name-form__error" id="register-password-confirmation-error" data-password-confirmation-error role="alert" aria-live="polite" aria-hidden="true"></p>
                 </div>
               </div>
 
@@ -290,6 +291,18 @@
             </div>
           </form>
         </div>
+      </div>
+      <div class="register-step register-step--success" data-register-step="5" hidden>
+        <section class="register-intro" aria-labelledby="register-success-title">
+          <p class="register-count"><strong>05</strong> / 05</p>
+          <img class="register-success__image" src="{{ url_for('static', path='/images/augustin/augustin-neutral.webp') }}" width="1254" height="1254" alt="" aria-hidden="true">
+          <h1 id="register-success-title" data-register-success-title tabindex="-1">Добро пожаловать<br>в Tutor<em>Flow</em><span>.</span></h1>
+          <p class="register-lead">Ваш аккаунт создан. Всё готово для начала работы.</p>
+          <a class="login-submit register-continue register-success__goto" data-register-goto href="/dashboard">
+            <span>Перейти в кабинет</span>
+            <svg class="register-continue__arrow register-success__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5" /></svg>
+          </a>
+        </section>
       </div>
       </div>
 

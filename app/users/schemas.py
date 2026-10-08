@@ -5,10 +5,15 @@ from app.users.models import UserRole
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
-    first_name: str = Field(min_length=1)
-    last_name: str = Field(min_length=1)
+    password: str = Field(min_length=8, max_length=128)
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(default="", max_length=100)
     role: UserRole
+
+    @field_validator("first_name", "last_name", mode="before")
+    @classmethod
+    def strip_names(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("email", mode="before")
     @classmethod
@@ -17,7 +22,7 @@ class UserCreate(BaseModel):
             return value.strip()
         return value
 
-    @field_validator("first_name", "last_name")
+    @field_validator("first_name")
     @classmethod
     def validate_required_name(cls, value: str) -> str:
         stripped_value = value.strip()

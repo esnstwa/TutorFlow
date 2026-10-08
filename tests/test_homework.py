@@ -2,6 +2,9 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends
 from fastapi.testclient import TestClient
+import pytest
+
+pytestmark = pytest.mark.usefixtures("legacy_cabinet_auth")
 
 from app.core.auth import get_current_student, get_current_teacher
 from app.core.database import get_db

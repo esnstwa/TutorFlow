@@ -1,5 +1,15 @@
 body:has(> .teacher-dashboard) { min-width: 0; background: #fff; }
 
+.student-directory-filters { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.student-directory-filters label { display: grid; gap: 7px; color: var(--dashboard-muted); font-size: 12px; }
+.student-directory-search { flex: 1 1 240px; }
+.student-directory-filters input, .student-directory-filters select { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--dashboard-border); border-radius: var(--radius-sm); background: #fff; color: var(--color-text); font: inherit; }
+.student-directory-filters select { min-width: 160px; }
+.student-directory-filters input:focus-visible, .student-directory-filters select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.student-directory-filters .dashboard-secondary { display: inline-flex; align-items: center; text-decoration: none; }
+.student-directory-count { margin: 0 0 18px; color: var(--dashboard-muted); font-size: 12px; }
+@media (max-width: 600px) { .student-directory-filters label { flex: 1 1 100%; min-width: 0; } }
+
 .teacher-dashboard {
   --dashboard-muted: #707787;
   --dashboard-border: #eceef4;

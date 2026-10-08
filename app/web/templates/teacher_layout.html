@@ -29,7 +29,7 @@
           <div class="dashboard-profile-dropdown" id="profile-menu" role="menu" hidden>
             <a href="{{ url_for('teacher_profile') }}" data-spa role="menuitem">{{ icon('users') }}Профиль</a>
             <a href="{{ url_for('settings') }}" data-spa role="menuitem">{{ icon('settings') }}Настройки</a>
-            <form method="post" action="{{ url_for('auth_logout') }}"><button type="submit" role="menuitem">{{ icon('logout') }}Выйти</button></form>
+            <form method="post" action="{{ url_for('auth_logout') }}"><input type="hidden" name="csrf_token" value="{{ request.state.csrf_token|default('', true) }}"><button type="submit" role="menuitem">{{ icon('logout') }}Выйти</button></form>
           </div>
         </div>
       </div>
@@ -54,4 +54,4 @@
 </div>
 {% endblock %}
 
-{% block scripts %}<script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script><script src="{{ url_for('static', path='/js/homework.js') }}?v={{ static_version('js/homework.js') }}" defer></script><script src="{{ url_for('static', path='/js/schedule.js') }}?v={{ static_version('js/schedule.js') }}" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', path='/js/student-lifecycle.js') }}?v={{ static_version('js/student-lifecycle.js') }}" defer></script><script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script><script src="{{ url_for('static', path='/js/homework.js') }}?v={{ static_version('js/homework.js') }}" defer></script><script src="{{ url_for('static', path='/js/schedule.js') }}?v={{ static_version('js/schedule.js') }}" defer></script>{% endblock %}

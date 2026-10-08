@@ -55,8 +55,14 @@ def initials(first_name: str, last_name: str = "") -> str:
 
 
 def student_dict(student: Student) -> dict[str, Any]:
+    from sqlalchemy.orm import object_session
+    from app.students.service import lifecycle
+    state = lifecycle(object_session(student), student)
     name = " ".join(part for part in (student.first_name, student.last_name) if part)
     return {
+        "archived": student.archived_at is not None,
+        "lifecycle": state,
+        "lifecycle_label": {"unlinked": "Не связан", "invited": "Приглашен", "linked": "Связан"}[state],
         "id": student.id,
         "name": name,
         "first_name": student.first_name,
@@ -66,6 +72,33 @@ def student_dict(student: Student) -> dict[str, Any]:
         "grade": student.grade,
         "email": student.email or (student.user.email if student.user else ""),
         "avatar": student.avatar,
+    }
+
+
+def student_directory(db: Session, teacher: User, query: str = "", subject: str = "", archived: str = "active") -> dict[str, Any]:
+    if archived not in {"active", "archived", "all"}:
+        raise ValueError("Неизвестный фильтр архива")
+    statement = select(Student).options(selectinload(Student.user)).where(Student.teacher_id == teacher.id)
+    if archived == "active":
+        statement = statement.where(Student.archived_at.is_(None))
+    elif archived == "archived":
+        statement = statement.where(Student.archived_at.is_not(None))
+    rows = [student_dict(item) for item in db.scalars(statement.order_by(Student.id))]
+    query, subject = query.strip(), subject.strip()
+    terms = query.casefold().replace("ё", "е").split()
+    visible = []
+    for row in rows:
+        searchable = " ".join(row[field] for field in ("name", "email", "grade", "subject"))
+        searchable = searchable.casefold().replace("ё", "е")
+        if (not subject or row["subject"] == subject) and all(term in searchable for term in terms):
+            visible.append(row)
+    return {
+        "directory_students": visible,
+        "directory_total": len(rows),
+        "directory_subjects": sorted({row["subject"] for row in rows if row["subject"]}),
+        "directory_query": query,
+        "directory_subject": subject,
+        "directory_archived": archived,
     }
 
 
@@ -182,7 +215,7 @@ def scoped_review(db: Session, teacher_id: int, review_id: int) -> HomeworkRevie
 
 
 def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
-    students = list(db.scalars(select(Student).options(selectinload(Student.user)).where(Student.teacher_id == teacher.id).order_by(Student.id)))
+    students = list(db.scalars(select(Student).options(selectinload(Student.user)).where(Student.teacher_id == teacher.id, Student.archived_at.is_(None)).order_by(Student.id)))
     lessons = list(db.scalars(select(Lesson).options(
         selectinload(Lesson.student).selectinload(Student.user),
         selectinload(Lesson.materials),
@@ -260,14 +293,14 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
 
 def create_entity(db: Session, teacher: User, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     if kind == "student":
-        parts = str(payload["name"]).strip().split(maxsplit=1)
-        item = Student(teacher_id=teacher.id, first_name=parts[0], last_name=parts[1] if len(parts) > 1 else "", email=str(payload["email"]).strip(), subject=str(payload["subject"]).strip(), grade=str(payload["grade"]).strip())
+        from app.students.schemas import validated_fields
+        item = Student(teacher_id=teacher.id, **validated_fields(payload))
         db.add(item)
         db.flush()
         return student_dict(item)
     if kind == "lesson":
         student = scoped_student(db, teacher.id, int(payload["student_id"]))
-        if not student:
+        if not student or student.archived_at is not None:
             raise ValueError("Ученик не найден")
         start_at = local_datetime(str(payload["date"]), str(payload["start"]))
         end_at = local_datetime(str(payload["date"]), str(payload["end"]))

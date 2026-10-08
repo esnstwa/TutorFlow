@@ -1,4 +1,7 @@
 from fastapi.testclient import TestClient
+import pytest
+
+pytestmark = pytest.mark.usefixtures("legacy_cabinet_auth")
 
 from app.main import app
 
@@ -65,7 +68,7 @@ def test_mock_entity_validation() -> None:
 def test_logout_returns_to_public_page() -> None:
     response = client.post("/logout", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/"
+    assert response.headers["location"] == "/login"
 
 
 def test_schedule_has_interactive_calendar_data() -> None:

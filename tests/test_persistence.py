@@ -1,5 +1,9 @@
 from fastapi import Depends
 from fastapi.testclient import TestClient
+import pytest
+
+pytestmark = pytest.mark.usefixtures("legacy_cabinet_auth")
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -38,7 +42,11 @@ def test_student_crud_and_persistence() -> None:
         assert new_session.get(Student, student_id).grade == "9 класс"
 
     assert client.delete(f"/api/students/{student_id}").status_code == 200
-    assert client.get(f"/students/{student_id}").status_code == 404
+    archived = client.get(f"/students/{student_id}")
+    assert archived.status_code == 200
+    assert "В архиве" in archived.text
+    with TestingSessionLocal() as new_session:
+        assert new_session.get(Student, student_id).archived_at is not None
 
 
 def test_lesson_crud_status_note_and_date_range() -> None:

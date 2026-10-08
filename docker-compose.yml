@@ -3,9 +3,10 @@ services:
     build: .
     environment:
       APP_NAME: TutorFlow
+      APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-tutorflow}:${POSTGRES_PASSWORD:-tutorflow}@db:5432/${POSTGRES_DB:-tutorflow}
     ports:
-      - "8000:8000"
+      - "${TUTORFLOW_BIND_HOST:-127.0.0.1}:8000:8000"
     depends_on:
       db:
         condition: service_healthy

@@ -233,7 +233,7 @@ def student_recipients(db: Session, student_id: int) -> list[HomeworkRecipient]:
 
 def search_students(db: Session, teacher_id: int, query: str) -> list[Student]:
     needle = query.strip().casefold()
-    students = list(db.scalars(select(Student).where(Student.teacher_id == teacher_id)))
+    students = list(db.scalars(select(Student).where(Student.teacher_id == teacher_id, Student.archived_at.is_(None))))
     if not needle:
         return sorted(students, key=lambda row: (row.first_name.casefold(), row.last_name.casefold()))[:20]
 
@@ -264,7 +264,7 @@ def create_homework(db: Session, teacher: User, data: HomeworkCreate) -> Homewor
 
     students = list(
         db.scalars(
-            select(Student).where(Student.teacher_id == teacher.id, Student.id.in_(data.recipient_ids))
+            select(Student).where(Student.teacher_id == teacher.id, Student.archived_at.is_(None), Student.id.in_(data.recipient_ids))
         )
     )
     if len(students) != len(data.recipient_ids):
