@@ -32,7 +32,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      APP_ENV: test
       DATABASE_URL: postgresql+psycopg://tutorflow:tutorflow_test@localhost:5432/tutorflow_test
       FILE_STORAGE_PATH: /tmp/tutorflow-uploads
       TMPDIR: /tmp
