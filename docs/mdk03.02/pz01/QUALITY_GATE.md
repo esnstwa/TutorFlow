@@ -29,10 +29,10 @@ Workflow `.github/workflows/quality-gate.yml` запускается на PR и 
 | Issue | [#4 — Подготовить ПЗ №1 МДК.03.02 и Quality Gate v0](https://github.com/esnstwa/TutorFlow/issues/4). |
 | Branch | `codex/mdk-pz01-quality-gate`, создана от `43ce8a4`. |
 | Changes | Документы ПЗ, GitHub templates, CODEOWNERS и настоящий workflow. |
-| Commit | TODO после фиксации текущих изменений. |
-| PR | TODO после push; должен содержать `Closes #4`. |
-| Checks | Локально: compile — успешно; pytest — `184 passed`; Node.js — `40 passed`; чистая PostgreSQL 16 — `upgrade/current/check` успешно; GitHub Actions — TODO после запуска. |
-| Review | TODO(external): запросить `@iver-ks`; review автора не засчитывать. |
+| Commit | `0fb9fd9` — комплект; `6a5f0cd`, `032f718` — исправления CI по результатам runs. |
+| PR | [#5](https://github.com/esnstwa/TutorFlow/pull/5), содержит `Closes #4`. |
+| Checks | Локально: compile — успешно; pytest — `184 passed`; Node.js — `40 passed`; чистая PostgreSQL 16 — `upgrade/current/check` успешно. [GitHub Actions run 37936284338](https://github.com/esnstwa/TutorFlow/actions/runs/37936284338) — `success`. |
+| Review | Запрошен у `@iver-ks`; TODO(external), review автора не засчитывается. |
 | Merge | Запрещён до зелёного CI и независимого approval, потому что изменение значимое. |
 
 ## Ограничение enforcement
