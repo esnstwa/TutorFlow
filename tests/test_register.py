@@ -66,7 +66,7 @@ def test_register_page() -> None:
     assert 'class="register-complete__stage"' in response.text
     assert "register-complete__spark" not in response.text
     assert "augustin-teacher-complete.webp" in response.text
-    assert "augustin-student-complete.webp" in response.text
+    assert "augustin-student-complete.png" in response.text
     assert 'value="teacher" checked' in response.text
     assert "augustin-teacher-role.webp" in response.text
     assert "augustin-student-role.webp" in response.text
@@ -88,7 +88,7 @@ def test_register_assets_are_served() -> None:
         ("/static/js/register.js", "application/javascript"),
         ("/static/images/registration/augustin-student-role.webp", "image/webp"),
         ("/static/images/registration/augustin-teacher-role.webp", "image/webp"),
-        ("/static/images/registration/augustin-student-complete.webp", "image/webp"),
+        ("/static/images/registration/augustin-student-complete.png", "image/png"),
         ("/static/images/registration/augustin-teacher-complete.webp", "image/webp"),
     ):
         response = client.get(path)

@@ -1,0 +1,3 @@
+{% extends "teacher_layout.html" %}
+{% block teacher_title %}Профиль{% endblock %}{% block page_heading %}Профиль{% endblock %}{% block page_description %}Данные преподавателя{% endblock %}
+{% block teacher_content %}<section class="dashboard-card dashboard-profile-card dashboard-profile-card--teacher"><span class="dashboard-avatar dashboard-avatar--large">{{ teacher.initials }}</span><h2>{{ teacher.name }}</h2><p>Преподаватель · {{ teacher.subject }}</p><a class="dashboard-secondary" href="{{ url_for('settings') }}" data-spa>Открыть настройки</a></section>{% endblock %}

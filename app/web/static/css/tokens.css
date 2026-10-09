@@ -1,8 +1,8 @@
 :root {
   --color-primary: #1a2cff;
-  --color-background: #e8e6e1;
+  --color-background: #f2f1ed;
   --color-text: #111111;
-  --color-surface: #f2f0ec;
+  --color-surface: #f8f7f3;
   --color-text-muted: rgba(17, 17, 17, 0.62);
   --color-border: rgba(17, 17, 17, 0.2);
   --color-border-strong: rgba(17, 17, 17, 0.42);

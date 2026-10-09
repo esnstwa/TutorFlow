@@ -13,7 +13,7 @@
   <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-teacher-role.webp') }}">
   <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-student-role.webp') }}">
   <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-teacher-complete.webp') }}">
-  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-student-complete.webp') }}">
+  <link rel="preload" as="image" type="image/png" href="{{ url_for('static', path='/images/registration/augustin-student-complete.png') }}">
 {% endblock %}
 
 {% block content %}
@@ -67,6 +67,7 @@
       </section>
 
       <form class="role-form" aria-label="Выбор роли">
+          <p class="register-role-error name-form__error" data-role-error role="alert" aria-hidden="true"></p>
           <fieldset class="role-grid">
           <legend class="visually-hidden">Как вы будете использовать TutorFlow?</legend>
 
@@ -230,7 +231,7 @@
                       </svg>
                     </button>
                   </div>
-                  <p class="name-form__error" id="register-password-error" data-password-error aria-live="polite" aria-hidden="true"></p>
+                  <p class="name-form__error" id="register-password-error" data-password-error role="alert" aria-live="polite" aria-hidden="true"></p>
                 </div>
 
                 <div class="name-form__field">
@@ -264,7 +265,7 @@
                       </svg>
                     </button>
                   </div>
-                  <p class="name-form__error" id="register-password-confirmation-error" data-password-confirmation-error aria-live="polite" aria-hidden="true"></p>
+                  <p class="name-form__error" id="register-password-confirmation-error" data-password-confirmation-error role="alert" aria-live="polite" aria-hidden="true"></p>
                 </div>
               </div>
 
@@ -301,11 +302,10 @@
           </form>
         </div>
       </div>
-
       <div class="register-step register-step--complete" data-register-step="5" hidden>
         <section class="register-intro register-complete__intro" aria-labelledby="register-complete-title">
           <p class="register-count"><strong>05</strong> / 05</p>
-          <h1 id="register-complete-title">Всё <em>готово</em><span>.</span></h1>
+          <h1 id="register-complete-title" data-register-success-title tabindex="-1">Всё <em>готово</em><span>.</span></h1>
           <p class="register-complete__account"><strong data-register-complete-name></strong>, ваш аккаунт TutorFlow создан.</p>
           <p class="register-lead register-complete__description" data-register-complete-description></p>
         </section>
@@ -317,7 +317,7 @@
               data-register-complete-character
               src="{{ url_for('static', path='/images/registration/augustin-teacher-complete.webp') }}"
               data-teacher-src="{{ url_for('static', path='/images/registration/augustin-teacher-complete.webp') }}"
-              data-student-src="{{ url_for('static', path='/images/registration/augustin-student-complete.webp') }}"
+              data-student-src="{{ url_for('static', path='/images/registration/augustin-student-complete.png') }}"
               width="1402"
               height="1122"
               alt="Августин с книгой и указкой"
@@ -326,9 +326,8 @@
           <a
             class="login-submit register-continue register-complete__button"
             data-register-complete
-            data-teacher-href="{{ url_for('landing') }}"
-            data-student-href="{{ url_for('landing') }}"
-            href="{{ url_for('landing') }}"
+            data-register-goto
+            href="/dashboard"
           >
             <span>Перейти в TutorFlow</span>
             <svg class="register-continue__arrow" viewBox="0 0 24 24" aria-hidden="true">

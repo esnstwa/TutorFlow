@@ -1,3 +1,7 @@
+/* Server validation for the role step; steps 1–4 keep their geometry. */
+.register-role-error { display: none; }
+.register-role-error.is-visible { display: block; }
+
 :root {
   --register-blue: #183cff;
   --register-muted: #66718b;

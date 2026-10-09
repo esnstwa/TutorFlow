@@ -1,0 +1,3 @@
+{% extends "teacher_layout.html" %}
+{% block teacher_title %}Настройки{% endblock %}{% block page_heading %}Настройки{% endblock %}{% block page_description %}Основные параметры кабинета.{% endblock %}
+{% block teacher_content %}<section class="dashboard-card dashboard-form-card"><h2>Профиль преподавателя</h2><form data-settings-form><label>Имя<input name="name" value="{{ teacher.name }}"></label><label>Предмет<input name="subject" value="{{ teacher.subject }}"></label><button class="dashboard-primary" type="submit">Сохранить</button><span class="dashboard-inline-status" role="status"></span></form></section>{% endblock %}

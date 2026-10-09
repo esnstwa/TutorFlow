@@ -1,0 +1,59 @@
+{% extends "teacher_layout.html" %}
+
+{% block teacher_title %}Главная — кабинет преподавателя{% endblock %}
+{% block teacher_header %}
+<div class="dashboard-greeting"><h1>Добрый день, <em>{{ teacher.name }}!</em></h1><p>Сегодня у вас {{ today_lessons|length }} занятия. Всё под контролем!</p></div>
+{% endblock %}
+
+{% block teacher_content %}
+<div class="dashboard-grid">
+  <section class="dashboard-card dashboard-next" aria-labelledby="next-title">
+    <div class="dashboard-card-heading"><h2 id="next-title">Следующее занятие</h2><span class="dashboard-countdown">{{ icon('clock') }}Через 1 ч 20 мин</span></div>
+    {% if next_lesson %}
+    <div class="dashboard-lesson-body">
+      <div class="dashboard-lesson-details">
+        <a class="dashboard-student dashboard-inline-link" href="{{ url_for('student_profile', student_id=next_lesson.student.id) }}" data-spa>
+          <span class="dashboard-avatar dashboard-avatar--student" aria-hidden="true">{{ next_lesson.student.initials }}</span>
+          <span><strong>{{ next_lesson.student.name }}</strong><small>{{ next_lesson.student.subject }} · {{ next_lesson.student.grade }}</small></span>
+        </a>
+        <div class="dashboard-topic"><span>Тема занятия</span><h3>{{ next_lesson.topic }}</h3></div>
+        <p class="dashboard-lesson-time">{{ icon('calendar') }}Сегодня, {{ next_lesson.date }}<span class="dashboard-time-divider">·</span><span>{{ next_lesson.start }}–{{ next_lesson.end }}</span></p>
+        <a class="dashboard-primary" href="{{ url_for('lesson', lesson_id=next_lesson.id) }}" data-spa>Перейти к занятию{{ icon('arrow') }}</a>
+      </div>
+      <div class="dashboard-mascot"><img src="{{ url_for('static', path='/images/augustin/augustin-focused.webp') }}" alt="Синий Августин — преподаватель TutorFlow в очках" width="1254" height="1254" fetchpriority="high"></div>
+    </div>
+    {% else %}<div class="dashboard-empty"><h3>Занятий пока нет</h3><p>Создайте занятие через быстрые действия.</p></div>{% endif %}
+  </section>
+
+  <section class="dashboard-card dashboard-schedule" aria-labelledby="schedule-title">
+    <div class="dashboard-card-heading"><h2 id="schedule-title">Расписание на сегодня</h2><a class="dashboard-text-link" href="{{ url_for('schedule') }}" data-spa>Весь день</a></div>
+    {% if today_lessons %}<ol class="dashboard-timeline">
+      {% for lesson_item in today_lessons %}
+      <li{% if lesson_item.is_next %} class="is-next" aria-current="true"{% endif %}>
+        <a class="dashboard-timeline-time" href="{{ url_for('lesson', lesson_id=lesson_item.id) }}" data-spa><time>{{ lesson_item.start }}</time><span>{{ lesson_item.end }}</span></a>
+        <div class="dashboard-timeline-dot"></div>
+        <div class="dashboard-timeline-lesson"><a href="{{ url_for('student_profile', student_id=lesson_item.student.id) }}" data-spa><h3>{{ lesson_item.student.name }}</h3></a><a href="{{ url_for('lesson', lesson_id=lesson_item.id) }}" data-spa><p>{{ lesson_item.student.subject }} · {{ lesson_item.student.grade }}</p>{% if lesson_item.is_next %}<span class="dashboard-next-label">Ближайшее</span>{% endif %}</a></div>
+      </li>{% endfor %}
+    </ol>{% else %}<div class="dashboard-empty"><p>Сегодня занятий нет.</p></div>{% endif %}
+  </section>
+
+  <section class="dashboard-card dashboard-attention" id="attention" aria-labelledby="attention-title">
+    <div class="dashboard-card-heading"><h2 id="attention-title">Требует внимания</h2><a class="dashboard-text-link" href="{{ url_for('notifications') }}" data-spa>Все события</a></div>
+    {% if notifications %}<ul class="dashboard-attention-list">
+      {% for event in notifications %}
+      {% if event.kind == 'submission' %}{% set target_url = url_for('submission', submission_id=event.target_id) %}{% elif event.kind == 'assignment' %}{% set target_url = url_for('assignment', assignment_id=event.target_id) %}{% else %}{% set target_url = url_for('dialog', dialog_id=event.target_id) %}{% endif %}
+      <li><a class="dashboard-attention-row" href="{{ target_url }}" data-spa><span class="dashboard-attention-icon dashboard-attention-icon--{{ event.tone }}">{{ icon(event.icon) }}</span><span class="dashboard-attention-copy"><strong>{{ event.title }}</strong><span>{{ event.description }}</span></span><span class="dashboard-attention-time">{{ event.when }}</span>{{ icon('chevron', 'dashboard-row-arrow') }}</a></li>
+      {% endfor %}
+    </ul>{% else %}<div class="dashboard-empty"><h3>Всё спокойно</h3><p>Новых событий нет.</p></div>{% endif %}
+  </section>
+
+  <section class="dashboard-card dashboard-quick" aria-labelledby="quick-title">
+    <div class="dashboard-card-heading"><h2 id="quick-title">Быстрые действия</h2></div>
+    <div class="dashboard-actions">
+      {% for symbol, label, modal in [('plus', 'Создать занятие', 'lesson'), ('assignment', 'Выдать задание', 'assignment'), ('user-plus', 'Добавить ученика', 'student'), ('upload', 'Загрузить материал', 'material')] %}
+      <button type="button" class="dashboard-action" {% if modal == 'assignment' %}data-homework-open{% else %}data-open-modal="{{ modal }}"{% endif %}>{{ icon(symbol) }}<span>{{ label }}</span></button>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

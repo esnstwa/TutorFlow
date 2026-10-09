@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "components/dashboard_icons.html" import icon %}
+
+{% block title %}{% block teacher_title %}Кабинет преподавателя{% endblock %} · TutorFlow{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/schedule.css') }}?v={{ static_version('css/schedule.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/homework.css') }}?v={{ static_version('css/homework.css') }}">{% endblock %}
+
+{% block content %}
+<div class="teacher-dashboard" data-teacher-shell>
+  <a class="dashboard-skip" href="#dashboard-main">Перейти к содержимому</a>
+  <aside class="dashboard-sidebar" aria-label="Боковая панель">
+    <a class="dashboard-wordmark" href="{{ url_for('dashboard') }}" data-spa aria-label="TutorFlow — главная"><span>Tutor</span><em>Flow</em></a>
+    <nav class="dashboard-nav" aria-label="Кабинет преподавателя">
+      {% for route, symbol, label in teacher_navigation %}
+      <a class="dashboard-nav-item{% if active_section == route %} is-current{% endif %}" href="{{ url_for(route) }}" data-spa {% if active_section == route %}aria-current="page"{% endif %}>{{ icon(symbol) }}<span>{{ label }}</span>{% if route == 'assignments' %}<span class="dashboard-count" aria-label="{{ assignments|length }} задания">{{ assignments|length }}</span>{% endif %}</a>
+      {% endfor %}
+    </nav>
+    <a class="dashboard-nav-item dashboard-settings{% if active_section == 'settings' %} is-current{% endif %}" href="{{ url_for('settings') }}" data-spa {% if active_section == 'settings' %}aria-current="page"{% endif %}>{{ icon('settings') }}<span>Настройки</span></a>
+  </aside>
+
+  <main class="dashboard-main" id="dashboard-main">
+    <header class="dashboard-header">
+      {% block teacher_header %}
+      <div class="dashboard-page-heading"><h1>{% block page_heading %}{% endblock %}</h1><p>{% block page_description %}{% endblock %}</p></div>
+      {% endblock %}
+      <div class="dashboard-account">
+        <a class="dashboard-notifications{% if active_section == 'notifications' %} is-current{% endif %}" href="{{ url_for('notifications') }}" data-spa aria-label="Уведомления: {{ notifications|length }} события">{{ icon('bell') }}{% if notifications %}<span></span>{% endif %}</a>
+        <div class="dashboard-profile-menu">
+          <button class="dashboard-profile" type="button" data-profile-trigger aria-haspopup="menu" aria-expanded="false" aria-controls="profile-menu"><span class="dashboard-avatar dashboard-avatar--teacher" aria-hidden="true">{{ teacher.initials }}</span>{{ icon('down') }}</button>
+          <div class="dashboard-profile-dropdown" id="profile-menu" role="menu" hidden>
+            <a href="{{ url_for('teacher_profile') }}" data-spa role="menuitem">{{ icon('users') }}Профиль</a>
+            <a href="{{ url_for('settings') }}" data-spa role="menuitem">{{ icon('settings') }}Настройки</a>
+            <form method="post" action="{{ url_for('auth_logout') }}"><input type="hidden" name="csrf_token" value="{{ request.state.csrf_token|default('', true) }}"><button type="submit" role="menuitem">{{ icon('logout') }}Выйти</button></form>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dashboard-view" data-dashboard-view aria-live="polite">
+      {% block teacher_content %}{% endblock %}
+    </div>
+  </main>
+
+  <dialog class="dashboard-modal" data-modal aria-labelledby="modal-title">
+    <form class="dashboard-modal-card" data-modal-form>
+      <div class="dashboard-modal-header"><div><span class="dashboard-modal-kicker">Быстрое действие</span><h2 id="modal-title" data-modal-title></h2></div><button type="button" class="dashboard-modal-close" data-modal-close aria-label="Закрыть">{{ icon('close') }}</button></div>
+      <div class="dashboard-modal-fields" data-modal-fields></div>
+      <p class="dashboard-form-error" data-modal-error role="alert" hidden></p>
+      <div class="dashboard-modal-actions"><button type="button" class="dashboard-secondary" data-modal-close>Отмена</button><button type="submit" class="dashboard-primary" data-modal-submit>Создать</button></div>
+    </form>
+  </dialog>
+  {% include "components/homework_modal.html" %}
+  <div class="dashboard-toast" data-toast role="status" hidden></div>
+  <script type="application/json" data-student-options>{{ students|tojson }}</script>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', path='/js/student-lifecycle.js') }}?v={{ static_version('js/student-lifecycle.js') }}" defer></script><script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script><script src="{{ url_for('static', path='/js/homework.js') }}?v={{ static_version('js/homework.js') }}" defer></script><script src="{{ url_for('static', path='/js/schedule.js') }}?v={{ static_version('js/schedule.js') }}" defer></script>{% endblock %}

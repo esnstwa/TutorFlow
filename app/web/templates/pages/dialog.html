@@ -1,0 +1,3 @@
+{% extends "teacher_layout.html" %}
+{% block teacher_title %}Диалог с {{ dialog.student.name }}{% endblock %}{% block page_heading %}{{ dialog.student.name }}{% endblock %}{% block page_description %}Сообщения{% endblock %}
+{% block teacher_content %}<section class="dashboard-card dashboard-dialog-card"><div class="dashboard-messages">{% for message in dialog.messages %}<article class="dashboard-message{% if message.author == teacher.name %} is-own{% endif %}"><strong>{{ message.author }}</strong><p>{{ message.text }}</p><time>{{ message.time }}</time></article>{% endfor %}</div></section>{% endblock %}

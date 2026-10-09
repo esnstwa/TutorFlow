@@ -1,0 +1,53 @@
+{% extends "teacher_layout.html" %}
+{% block teacher_title %}{{ student.name }}{% endblock %}
+{% block page_heading %}{{ student.name }}{% endblock %}
+{% block page_description %}Профиль ученика{% endblock %}
+{% block teacher_content %}
+<div class="dashboard-detail-grid">
+  <section class="dashboard-card dashboard-profile-card" data-student-lifecycle data-student-id="{{ student.id }}">
+    <span class="dashboard-avatar dashboard-avatar--large">{{ student.initials }}</span>
+    <h2>{{ student.name }}</h2><p>{{ student.subject }} · {{ student.grade }}</p>
+    <dl class="dashboard-details">
+      <div><dt>Почта</dt><dd>{{ student.email or 'Не указана' }}</dd></div>
+      <div><dt>Аккаунт</dt><dd><span class="dashboard-status">{{ student.lifecycle_label }}</span></dd></div>
+      <div><dt>Статус</dt><dd>{% if student.archived %}В архиве{% else %}Учится{% endif %}</dd></div>
+    </dl>
+    {% if not student.archived %}
+    <div class="dashboard-modal-actions">
+      <button type="button" class="dashboard-secondary" data-student-edit>Редактировать</button>
+      {% if student.lifecycle != 'linked' %}<button type="button" class="dashboard-primary" data-student-invite>Пригласить</button>{% endif %}
+      <button type="button" class="dashboard-secondary" data-student-archive>В архив</button>
+    </div>
+    {% endif %}
+    <p class="dashboard-form-error" data-lifecycle-error role="alert" hidden></p>
+    <div data-invite-result hidden>
+      <p>Передайте ссылку ученику. Он войдет с указанной почтой и подтвердит привязку. Повторное приглашение отменяет предыдущую ссылку.</p>
+      <label>Ссылка приглашения<input type="text" readonly data-invite-url aria-label="Ссылка приглашения"></label>
+      <button type="button" class="dashboard-secondary" data-copy-invite>Копировать ссылку</button>
+      <p data-invite-expiry role="status"></p>
+    </div>
+    <dialog class="dashboard-modal" data-student-edit-dialog aria-labelledby="student-edit-title">
+      <form class="dashboard-modal-card" data-student-edit-form>
+        <div class="dashboard-modal-header"><h2 id="student-edit-title">Редактирование ученика</h2><button type="button" class="dashboard-modal-close" data-lifecycle-close aria-label="Закрыть">×</button></div>
+        <div class="dashboard-modal-fields">
+          <label>Имя и фамилия<input name="name" value="{{ student.name }}" required maxlength="100"></label>
+          <label>Почта<input type="email" name="email" value="{{ student.email or '' }}" maxlength="320"></label>
+          <label>Предмет<input name="subject" value="{{ student.subject }}" maxlength="120" required></label>
+          <label>Класс<input name="grade" value="{{ student.grade }}" maxlength="50"></label>
+        </div>
+        <p class="dashboard-form-error" data-edit-error role="alert" hidden></p>
+        <div class="dashboard-modal-actions"><button type="button" class="dashboard-secondary" data-lifecycle-close>Отмена</button><button type="submit" class="dashboard-primary">Сохранить</button></div>
+      </form>
+    </dialog>
+    <dialog class="dashboard-modal" data-student-archive-dialog aria-labelledby="student-archive-title">
+      <form class="dashboard-modal-card" data-student-archive-form>
+        <h2 id="student-archive-title">Перенести ученика в архив?</h2>
+        <p>Учебная история сохранится: занятия, задания, ответы и проверки не удаляются. Новые задания и приглашения будут недоступны.</p>
+        <p class="dashboard-form-error" data-archive-error role="alert" hidden></p>
+        <div class="dashboard-modal-actions"><button type="button" class="dashboard-secondary" data-lifecycle-close>Отмена</button><button type="submit" class="dashboard-primary">В архив</button></div>
+      </form>
+    </dialog>
+  </section>
+  <section class="dashboard-card dashboard-page-card"><h2>Занятия</h2><div class="dashboard-entity-list">{% for item in lessons if item.student_id == student.id %}<article class="dashboard-entity-row"><time class="dashboard-entity-time">{{ item.start }}</time><div class="dashboard-entity-main"><a href="{{ url_for('lesson', lesson_id=item.id) }}" data-spa><strong>{{ item.topic }}</strong></a><span>{{ item.date }}</span></div>{{ icon('chevron') }}</article>{% else %}<div class="dashboard-empty"><p>Занятий пока нет.</p></div>{% endfor %}</div></section>
+</div>
+{% endblock %}

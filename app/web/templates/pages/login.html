@@ -60,7 +60,8 @@
             <p>Продолжите там, где остановились.</p>
           </div>
 
-          <form class="login-form" aria-label="Вход в аккаунт">
+          <form class="login-form" aria-label="Вход в аккаунт" method="post" action="/api/auth/login">
+            <p class="login-error" id="login-error" data-login-error role="alert" hidden></p>
             <div class="login-field">
               <label class="visually-hidden" for="login-email">Email</label>
               <input
@@ -69,9 +70,12 @@
                 type="email"
                 autocomplete="email"
                 placeholder="Email"
+                required
+                aria-describedby="login-email-error"
               >
             </div>
 
+            <p class="login-error" id="login-email-error" data-login-email-error role="alert" hidden></p>
             <div class="login-field login-field--password">
               <label class="visually-hidden" for="login-password">Пароль</label>
               <input
@@ -80,6 +84,8 @@
                 type="password"
                 autocomplete="current-password"
                 placeholder="Пароль"
+                required
+                aria-describedby="login-password-error"
               >
               <button
                 class="password-toggle"
@@ -102,6 +108,7 @@
               </button>
             </div>
 
+            <p class="login-error" id="login-password-error" data-login-password-error role="alert" hidden></p>
             <div class="login-options">
               <label class="remember-option">
                 <input type="checkbox" name="remember">
@@ -112,10 +119,10 @@
                 </span>
                 <span>Запомнить меня</span>
               </label>
-              <a class="login-link" id="password-recovery" href="#password-recovery">Забыли пароль?</a>
+              <span class="login-link" id="password-recovery" aria-disabled="true" aria-describedby="password-recovery-note" title="Восстановление пароля пока недоступно">Забыли пароль?<span class="login-recovery-note" id="password-recovery-note">Восстановление пароля пока недоступно</span></span>
             </div>
 
-            <button class="login-submit" type="button">Войти</button>
+            <button class="login-submit" type="submit">Войти</button>
           </form>
 
           <p class="login-register">

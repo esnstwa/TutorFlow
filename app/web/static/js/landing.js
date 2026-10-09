@@ -264,7 +264,7 @@
 
     const media = gsap.matchMedia();
     media.add({
-      animated: "(min-height: 640px) and (prefers-reduced-motion: no-preference)",
+      animated: "(min-width: 768px) and (min-height: 640px) and (prefers-reduced-motion: no-preference)",
       reduced: "(prefers-reduced-motion: reduce)",
       short: "(max-height: 639px)",
     }, context => {
