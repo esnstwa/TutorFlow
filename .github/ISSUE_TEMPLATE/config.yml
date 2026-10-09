@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Вопрос по требованиям ПЗ №1
+    url: https://github.com/esnstwa/TutorFlow/blob/main/docs/mdk03.02/pz01/README.md
+    about: Сначала проверьте спецификацию и открытые вопросы.

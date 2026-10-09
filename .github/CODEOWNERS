@@ -1,0 +1,5 @@
+# Default owner and independent reviewer candidate for shared process/docs.
+* @esnstwa
+/.github/ @esnstwa @iver-ks
+/docs/ @esnstwa @iver-ks
+/app/web/ @esnstwa @iver-ks
