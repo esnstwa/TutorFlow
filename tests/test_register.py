@@ -95,3 +95,39 @@ def test_register_assets_are_served() -> None:
 
         assert response.status_code == 200
         assert content_type in response.headers["content-type"]
+
+
+def test_route_character_uses_two_lossless_preloaded_moods() -> None:
+    page = client.get("/register").text
+    assert 'data-route-character-idle=' in page
+    assert 'data-route-character-happy=' in page
+    assert page.index('/js/register-route.js') < page.index('/js/register.js')
+    assert client.get('/static/js/register-route.js').status_code == 200
+    assert 'jump-01.webp' not in page
+    assert 'success.webp' not in page
+    for mood in ('idle', 'happy'):
+        path = f'/static/images/registration/route/augustin-{mood}.webp'
+        assert path in page
+        response = client.get(path)
+        assert response.status_code == 200
+        data = response.content
+        assert data[:4] == b'RIFF' and data[8:12] == b'WEBP'
+        # VP8L identifies lossless WebP; its packed header stores canvas and alpha.
+        assert data[12:16] == b'VP8L'
+        header = int.from_bytes(data[21:25], 'little')
+        assert (header & 0x3FFF) + 1 == 221
+        assert ((header >> 14) & 0x3FFF) + 1 == 210
+        assert (header >> 28) & 1
+
+
+def test_route_character_uses_one_precomputed_waapi_animation() -> None:
+    script = client.get('/static/js/register-route.js').text
+    assert 'this.layer.animate(' in script
+    assert 'offsetPath' in script
+    assert 'offsetDistance' in script
+    assert 'requestAnimationFrame' not in script
+    assert 'translate3d' not in script
+    assert 'devicePixelRatio' not in script
+    assert 'willChange' not in script
+    assert 'const segments' not in script
+    assert script.count("document.createElement('img')") == 1

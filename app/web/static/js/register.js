@@ -277,6 +277,29 @@
   }
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const routeElement = document.querySelector('.register-progress');
+  const routeCharacter = routeElement && window.TutorFlowRouteCharacter
+    ? new window.TutorFlowRouteCharacter(routeElement) : null;
+  let transitioning = false;
+
+  async function transitionStep(step) {
+    if (transitioning || step === registrationState.step) return;
+    transitioning = true;
+    const wasInert = registerMain.inert;
+    registerMain.inert = true;
+    registerMain.setAttribute('aria-busy', 'true');
+    try {
+      await routeCharacter?.jump(step);
+      // Restore interaction before showStep focuses the next field.
+      registerMain.inert = wasInert;
+      showStep(step);
+      routeCharacter?.snap(step);
+    } finally {
+      registerMain.inert = wasInert;
+      registerMain.removeAttribute('aria-busy');
+      transitioning = false;
+    }
+  }
   const characterMotions = new Map();
   const settleTimers = new Map();
 
@@ -387,12 +410,13 @@
 
   roleForm?.addEventListener("submit", event => {
     event.preventDefault();
+    if (transitioning) return;
     const selectedRole = roleForm.querySelector('input[name="role"]:checked');
     if (!selectedRole) return;
 
     registrationState.role = selectedRole.value;
     saveRegistrationState();
-    showStep(2);
+    transitionStep(2);
   });
 
   progressItems.forEach(item => {
@@ -400,7 +424,7 @@
     const returnToStep = () => {
       const itemStep = Number(item.dataset.registerProgress);
       if (itemStep >= registrationState.step) return;
-      showStep(itemStep);
+      transitionStep(itemStep);
     };
 
     node?.addEventListener("click", returnToStep);
@@ -455,6 +479,7 @@
 
   nameForm?.addEventListener("submit", event => {
     event.preventDefault();
+    if (transitioning) return;
     const name = nameInput.value.trim();
     const validationError = getNameValidationError(name);
 
@@ -471,7 +496,7 @@
     registrationState.name = name;
     saveRegistrationState();
     clearNameError();
-    showStep(3);
+    transitionStep(3);
   });
 
   if (emailInput && emailError && emailField) {
@@ -507,6 +532,7 @@
 
   emailForm?.addEventListener("submit", event => {
     event.preventDefault();
+    if (transitioning) return;
     const email = emailInput.value.trim();
     const validationError = getEmailValidationError(email);
 
@@ -524,7 +550,7 @@
     saveRegistrationState();
     clearEmailError();
     setEmailValidity(true);
-    showStep(4);
+    transitionStep(4);
   });
 
   if (passwordInput && passwordConfirmationInput && passwordError && passwordConfirmationError) {
@@ -575,6 +601,7 @@
 
   passwordForm?.addEventListener("submit", event => {
     event.preventDefault();
+    if (transitioning) return;
     const password = passwordInput.value;
     const confirmation = passwordConfirmationInput.value;
     const confirmationValidationError = getPasswordConfirmationError(password, confirmation);
@@ -594,7 +621,7 @@
     registrationState.password = password;
     registrationState.passwordConfirmation = confirmation;
     saveRegistrationState();
-    showStep(5);
+    transitionStep(5);
   });
 
   completeLink?.addEventListener("click", () => {
@@ -630,4 +657,5 @@
   const initialStep = hashSteps.get(location.hash)
     || (Number.isInteger(storedStep) && storedStep >= 1 && storedStep <= 5 ? storedStep : 1);
   showStep(initialStep);
+  routeCharacter?.snap(initialStep);
 })();

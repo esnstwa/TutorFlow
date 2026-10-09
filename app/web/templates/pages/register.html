@@ -8,6 +8,8 @@
 {% endblock %}
 
 {% block head %}
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/route/augustin-idle.webp') }}">
+  <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/route/augustin-happy.webp') }}">
   <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-teacher-role.webp') }}">
   <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-student-role.webp') }}">
   <link rel="preload" as="image" type="image/webp" href="{{ url_for('static', path='/images/registration/augustin-teacher-complete.webp') }}">
@@ -24,6 +26,12 @@
 
     <main class="register-main">
       <nav class="register-progress" aria-label="Прогресс регистрации">
+        <div
+          class="register-route-character"
+          data-route-character-idle="{{ url_for('static', path='/images/registration/route/augustin-idle.webp') }}"
+          data-route-character-happy="{{ url_for('static', path='/images/registration/route/augustin-happy.webp') }}"
+          aria-hidden="true"
+        ></div>
         <ol>
           <li class="is-active" aria-current="step" data-register-progress="1">
             <span>1</span>
@@ -341,5 +349,6 @@
 {% endblock %}
 
 {% block scripts %}
+  <script src="{{ url_for('static', path='/js/register-route.js') }}?v={{ static_version('js/register-route.js') }}" defer></script>
   <script src="{{ url_for('static', path='/js/register.js') }}?v={{ static_version('js/register.js') }}" defer></script>
 {% endblock %}
