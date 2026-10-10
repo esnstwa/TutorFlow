@@ -1,0 +1,40 @@
+name: Feature
+description: Новая пользовательская возможность TutorFlow
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Проблема и пользователь
+      description: Какую подтверждённую проблему какого пользователя решаем?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Наблюдаемый результат
+      description: Опишите критерии Дано → Когда → Тогда, включая ошибочный исход.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope / Out of scope
+      description: Что входит и намеренно не входит?
+    validations:
+      required: true
+  - type: input
+    id: requirements
+    attributes:
+      label: Связанные FR/NFR
+      placeholder: FR-08, NFR-04
+  - type: dropdown
+    id: significance
+    attributes:
+      label: Значимое изменение
+      options:
+        - Да — нужен независимый review
+        - Нет
+    validations:
+      required: true

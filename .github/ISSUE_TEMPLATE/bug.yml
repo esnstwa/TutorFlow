@@ -1,0 +1,39 @@
+name: Bug
+description: Воспроизводимый дефект TutorFlow
+title: "fix: "
+labels: [bug]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Фактическое поведение
+      description: Что наблюдается, где и для какой роли?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Шаги воспроизведения
+      description: Данные, запрос/страница, действия и результат. Не прикладывайте секреты.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Окружение и доказательства
+      description: Commit, ОС/браузер, лог без секретов, screenshot при необходимости.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Критичность
+      options: [critical, high, medium, low]
+    validations:
+      required: true

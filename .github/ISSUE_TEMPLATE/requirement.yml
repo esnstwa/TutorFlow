@@ -1,0 +1,33 @@
+name: Requirement change
+description: Добавление или изменение существенного требования
+title: "req: "
+labels: [documentation]
+body:
+  - type: input
+    id: requirement
+    attributes:
+      label: ID требования
+      placeholder: FR-XX или NFR-XX
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Основание
+      description: Интервью, дефект, нормативное ограничение или подтверждённый факт проекта. Не выдумывать источник.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: Дано → Когда → Тогда; штатный и существенный ошибочный исход.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Влияние и трассировка
+      description: MVP/Reserve, API, схема БД, безопасность, тесты и документы.
+    validations:
+      required: true
