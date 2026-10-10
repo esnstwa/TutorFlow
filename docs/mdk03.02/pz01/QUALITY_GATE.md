@@ -31,7 +31,7 @@ Workflow `.github/workflows/quality-gate.yml` запускается на PR и 
 | Changes | Документы ПЗ, GitHub templates, CODEOWNERS и настоящий workflow. |
 | Commit | `0fb9fd9` — комплект; `6a5f0cd`, `032f718` — исправления CI по результатам runs. |
 | PR | [#5](https://github.com/esnstwa/TutorFlow/pull/5), содержит `Closes #4`. |
-| Checks | Локально: compile — успешно; pytest — `184 passed`; Node.js — `40 passed`; чистая PostgreSQL 16 — `upgrade/current/check` успешно. [GitHub Actions run 37936533529](https://github.com/esnstwa/TutorFlow/actions/runs/37936533529) — `success`. |
+| Checks | Локально: compile — успешно; pytest — `184 passed`; Node.js — `40 passed`; чистая PostgreSQL 16 — `upgrade/current/check` успешно. [GitHub Actions run 38074245759](https://github.com/esnstwa/TutorFlow/actions/runs/38074245759) — `success`. |
 | Review | Запрошен у `@iver-ks`; TODO(external), review автора не засчитывается. |
 | Merge | Запрещён до зелёного CI и независимого approval, потому что изменение значимое. |
 

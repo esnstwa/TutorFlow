@@ -11,7 +11,7 @@
 | Ветка | `codex/mdk-pz01-quality-gate` |
 | Commit изменения | `0fb9fd9` — основной комплект; `6a5f0cd`, `032f718` — исправления CI по результатам реальных runs |
 | PR | [#5 — docs: подготовить ПЗ №1 и Quality Gate v0](https://github.com/esnstwa/TutorFlow/pull/5) |
-| Pipeline | [Quality Gate run 37936533529](https://github.com/esnstwa/TutorFlow/actions/runs/37936533529) — `success`, commit `f9ecf0d` |
+| Pipeline | [Quality Gate run 38074245759](https://github.com/esnstwa/TutorFlow/actions/runs/38074245759) — `success`, commit `fc85732` |
 | Независимый review | Запрошен у `@iver-ks` в PR #5; TODO(external), авторское self-review не засчитывается |
 | Tag | TODO: `0302-pz01-v1` только после внешних обязательных пунктов и merge |
 | Оппонирование | `PENDING OPPOSITION`, см. `OPPOSITION.md` |
@@ -35,7 +35,7 @@
 - Alembic на новой изолированной PostgreSQL 16: `upgrade head`, единственный head `d2b3c4d5e6f7`, `current` и `check` — успешно, новых операций не найдено;
 - `git diff --check` и разбор пяти YAML-файлов — успешно.
 
-GitHub Actions Quality Gate на commit `f9ecf0d` завершился успешно: compile, `184` Python-теста, `40` JavaScript-тестов и миграции на PostgreSQL 16 прошли. Два предыдущих run честно сохранены в истории: первый обнаружил недопустимый контекст пути до запуска job, второй — влияние `APP_ENV=test` на security-тест cookie; обе причины исправлены отдельными commit. Старый локальный Docker-том основного проекта содержит отсутствующую в репозитории ревизию `20260916_0002`; том не изменялся, а локальная проверка миграций выполнена на чистом изолированном томе.
+GitHub Actions Quality Gate на commit `fc85732` завершился успешно: compile, `184` Python-теста, `40` JavaScript-тестов и миграции на PostgreSQL 16 прошли. Два предыдущих run честно сохранены в истории: первый обнаружил недопустимый контекст пути до запуска job, второй — влияние `APP_ENV=test` на security-тест cookie; обе причины исправлены отдельными commit. Старый локальный Docker-том основного проекта содержит отсутствующую в репозитории ревизию `20260916_0002`; том не изменялся, а локальная проверка миграций выполнена на чистом изолированном томе.
 
 ## Вывод
 
