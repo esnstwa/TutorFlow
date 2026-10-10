@@ -31,12 +31,12 @@ Workflow `.github/workflows/quality-gate.yml` запускается на PR и 
 | Changes | Документы ПЗ, GitHub templates, CODEOWNERS и настоящий workflow. |
 | Commit | `0fb9fd9` — комплект; `6a5f0cd`, `032f718` — исправления CI по результатам runs. |
 | PR | [#5](https://github.com/esnstwa/TutorFlow/pull/5), содержит `Closes #4`. |
-| Checks | Локально: compile — успешно; pytest — `184 passed`; Node.js — `40 passed`; чистая PostgreSQL 16 — `upgrade/current/check` успешно. [GitHub Actions run 37936284338](https://github.com/esnstwa/TutorFlow/actions/runs/37936284338) — `success`. |
+| Checks | Локально: compile — успешно; pytest — `184 passed`; Node.js — `40 passed`; чистая PostgreSQL 16 — `upgrade/current/check` успешно. [GitHub Actions run 37936533529](https://github.com/esnstwa/TutorFlow/actions/runs/37936533529) — `success`. |
 | Review | Запрошен у `@iver-ks`; TODO(external), review автора не засчитывается. |
 | Merge | Запрещён до зелёного CI и независимого approval, потому что изменение значимое. |
 
 ## Ограничение enforcement
 
-На 2026-10-09 запрос GitHub branch protection для приватного репозитория вернул `403` с требованием GitHub Pro либо публичного репозитория. Конкретное ручное действие владельца: **перевести репозиторий на тариф с branch protection или сделать его публичным, затем включить правила из `ENGINEERING_PROCESS.md` для `main`**.
+На 2026-10-10 репозиторий имеет публичную видимость, а для default branch `main` включён активный repository ruleset `Protect main`. Он требует pull request, минимум один approval, approval последнего push, разрешение review threads и успешный status check `verify`; удаление ветки и force-push запрещены. Legacy endpoint branch protection возвращает `404`, поскольку защита настроена через ruleset, а не через старый механизм branch protection.
 
 Локальная PostgreSQL-проверка выполнялась в отдельном Compose-проекте и на новом томе. Существующий том основного проекта имеет неизвестную текущему репозиторию ревизию Alembic `20260916_0002`; он сохранён без изменений и не считается доказательством корректности актуальной цепочки миграций.

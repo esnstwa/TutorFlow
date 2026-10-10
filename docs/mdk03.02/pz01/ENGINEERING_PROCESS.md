@@ -41,7 +41,7 @@
 ## Правила `main`
 
 - `main` должна быть развёртываемой и иметь единственный Alembic head.
-- Прямые push запрещены правилами команды, даже если тариф GitHub технически не позволяет включить branch protection.
+- Прямые push запрещены правилами команды и активным ruleset GitHub `Protect main`.
 - Merge предпочтительно squash для одной логической задачи; merge commit допустим для интеграционной ветки с сохранением проверенной истории.
 - Force-push и переписывание истории `main` запрещены.
 - Релизный tag ставится только на commit из `main` после заполнения карточки доказательств.
@@ -55,12 +55,15 @@
 
 ## Независимый review и ограничения GitHub
 
-В репозитории есть второй collaborator `@iver-ks`, поэтому review можно запросить. На 2026-10-09 GitHub API вернул `403`: branch protection приватного репозитория требует GitHub Pro или публичности. До изменения тарифа правила выше обеспечиваются процессом и PR, но не серверным запретом.
+В репозитории есть второй collaborator `@iver-ks`, поэтому review можно запросить. Для `main` включён активный repository ruleset `Protect main`, применяемый к default branch. Он требует pull request, минимум один approval, approval последнего push, разрешение review threads и успешный status check `verify`; также запрещает удаление ветки и force-push. Legacy endpoint branch protection при этом возвращает `404`, потому что защита настроена через ruleset.
 
-Рекомендуемые настройки при появлении доступа:
+Фактически включённые правила:
 
 - Require a pull request before merging.
 - Require 1 approval; dismiss stale approvals.
-- Require status check `Quality Gate / verify`.
-- Require conversation resolution and branch up-to-date.
-- Block force pushes and deletion; запретить direct push в `main`.
+- Require approval of the last push.
+- Require conversation resolution.
+- Require status check `verify`.
+- Block force pushes and deletion of `main`.
+
+Разрешённые способы merge: merge commit и squash merge.
