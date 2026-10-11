@@ -1,9 +1,6 @@
-/* New final screen and role error only; steps 1–4 keep their geometry. */
+/* Server validation for the role step; steps 1–4 keep their geometry. */
 .register-role-error { display: none; }
 .register-role-error.is-visible { display: block; }
-.register-step--success .register-intro { margin-top: 0; }
-.register-success__image { display: block; width: clamp(7rem, 19vh, 12rem); height: auto; margin: 0 auto clamp(.6rem, 2vh, 1rem); object-fit: contain; }
-.register-success__goto { margin: clamp(1.15rem, 3vh, 1.7rem) auto 0; text-decoration: none; }
 
 :root {
   --register-blue: #183cff;
@@ -79,6 +76,41 @@ body {
   stroke-dasharray: 5 6.5;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
+}
+
+/* An independent overlay: no contribution to route or form geometry. */
+.register-route-character {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  width: clamp(2.75rem, 5.5vw, 3.5rem);
+  aspect-ratio: 221 / 210;
+  animation: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  filter: none;
+  opacity: 1;
+  pointer-events: none;
+  transition: none;
+  transform-origin: center;
+}
+
+.register-route-character__sprite {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-shadow: none;
+  filter: none;
+  image-rendering: auto;
+  object-fit: contain;
+  opacity: 1;
+  pointer-events: none;
+  transform: none;
+  animation: none;
+  transition: none;
 }
 
 .register-progress ol {
@@ -169,6 +201,8 @@ body {
   width: clamp(1.35rem, 2.3vw, 2.2rem);
   height: clamp(1.95rem, 3.3vw, 3.15rem);
   transform: translateY(-50%);
+  transform-box: fill-box;
+  transform-origin: 18% 88%;
 }
 
 .register-progress__flag path {
@@ -177,6 +211,17 @@ body {
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: stroke 320ms ease;
+}
+
+.register-progress li.is-active .register-progress__flag {
+  animation:
+    register-flag-arrive 560ms cubic-bezier(.2, .8, .25, 1) both,
+    register-flag-sway 2.1s ease-in-out 560ms infinite alternate;
+}
+
+.register-progress li.is-active .register-progress__flag path {
+  stroke: var(--register-blue);
 }
 
 .register-intro {
@@ -264,6 +309,77 @@ body {
   color: var(--register-muted);
   font-size: clamp(.9rem, 1.45vw, 1.12rem);
   line-height: 1.35;
+}
+
+.register-complete__intro {
+  margin-top: var(--register-flow-gap);
+}
+
+[data-register-success-title]:focus {
+  outline: none;
+}
+
+.register-step--complete {
+  --register-complete-character-gap: clamp(1.75rem, 3.8vh, 2.4rem);
+}
+
+.register-complete__account {
+  margin: clamp(.12rem, .3vh, .2rem) 0 0;
+  color: #090b13;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  line-height: 1.3;
+}
+
+.register-complete__account strong {
+  font-weight: inherit;
+}
+
+.register-complete__content {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  margin: var(--register-complete-character-gap) auto 0;
+  align-items: center;
+  flex-direction: column;
+}
+
+.register-complete__stage {
+  position: relative;
+  width: min(100%, clamp(20.8rem, 47.3vh, 30.25rem));
+  aspect-ratio: 1402 / 1122;
+  isolation: isolate;
+}
+
+.register-main[data-complete-role="student"] .register-complete__stage {
+  aspect-ratio: 1403 / 1121;
+}
+
+.register-complete__character {
+  display: block;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  object-fit: contain;
+  transform-origin: 50% 68%;
+}
+
+
+.register-main.is-complete .register-complete__stage {
+  animation: register-complete-arrive 720ms cubic-bezier(.2, .8, .25, 1) both;
+}
+
+.register-main.is-complete .register-complete__character {
+  animation: register-complete-float 2.8s cubic-bezier(.37, 0, .63, 1) 820ms infinite alternate;
+}
+
+.register-complete__button {
+  margin: var(--register-complete-character-gap) auto 0;
+  flex: 0 0 auto;
+  text-decoration: none;
 }
 
 .role-form {
@@ -506,8 +622,11 @@ body {
 }
 
 .role-card input:focus-visible + .role-card__surface {
-  outline: 3px solid rgba(24, 60, 255, .28);
-  outline-offset: 4px;
+  outline: none;
+}
+
+.role-card input:focus-visible + .role-card__surface .role-card__indicator {
+  box-shadow: 0 0 0 .22rem rgba(24, 60, 255, .22);
 }
 
 .role-card input:checked + .role-card__surface {
@@ -531,7 +650,7 @@ body {
   justify-content: center;
   background: transparent;
   color: #fff;
-  transition: border-color 200ms ease, background-color 200ms ease;
+  transition: border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease;
 }
 
 .role-card__indicator svg {
@@ -608,6 +727,10 @@ body {
   font-size: clamp(.78rem, 1.05vw, .9rem);
   line-height: 1;
   white-space: nowrap;
+}
+
+.register-login[hidden] {
+  display: none;
 }
 
 .register-login__line {
@@ -723,6 +846,23 @@ body {
     height: calc(clamp(18rem, 82vw, 21.5rem) + clamp(18rem, 82vw, 21.5rem) + 14rem);
   }
 
+  .register-main.is-complete .register-workspace,
+  .register-step--complete {
+    height: auto;
+  }
+
+  .register-step--complete {
+    padding-bottom: 1rem;
+  }
+
+  .register-complete__account {
+    font-size: 1rem;
+  }
+
+  .register-complete__stage {
+    width: min(100%, clamp(17rem, 77.5vw, 22.7rem));
+  }
+
   .name-form {
     --name-form-spacing: 1.5rem;
   }
@@ -781,5 +921,62 @@ body {
   .role-card__image img {
     transform: none;
     transition: none;
+  }
+
+  .register-complete__stage,
+  .register-complete__character,
+  .register-progress li.is-active .register-progress__flag {
+    animation: none !important;
+  }
+}
+
+@keyframes register-flag-arrive {
+  0% {
+    transform: translateY(-50%) rotate(0);
+  }
+
+  55% {
+    transform: translateY(-50%) rotate(-5deg);
+  }
+
+  100% {
+    transform: translateY(-50%) rotate(1.5deg);
+  }
+}
+
+@keyframes register-flag-sway {
+  from {
+    transform: translateY(-50%) rotate(1.5deg);
+  }
+
+  to {
+    transform: translateY(-50%) rotate(-1.5deg);
+  }
+}
+
+@keyframes register-complete-arrive {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 1rem, 0) scale(.91);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translate3d(0, -.12rem, 0) scale(1.012);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes register-complete-float {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0);
+  }
+
+  to {
+    transform: translate3d(0, -.625rem, 0) rotate(.8deg);
   }
 }

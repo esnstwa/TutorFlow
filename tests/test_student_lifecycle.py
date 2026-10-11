@@ -326,12 +326,11 @@ def test_invitation_expiring_while_acquiring_student_lock_is_rejected(ctx, monke
 
 
 def test_concurrent_accept_has_exactly_one_winner(ctx):
-    import os
     import tempfile
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
     from app.students.service import accept_invitation, issue_invitation
-    with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as directory:
+    with tempfile.TemporaryDirectory() as directory:
         engine = create_engine('sqlite:///' + directory.replace('\\', '/') + '/invites.sqlite', connect_args={'check_same_thread': False})
         Base.metadata.create_all(engine)
         factory = sessionmaker(engine, expire_on_commit=False)

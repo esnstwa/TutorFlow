@@ -36,16 +36,22 @@ def test_login_is_real_submit_with_required_fields_and_honest_recovery():
     assert attrs.get('role') == 'alert' and 'hidden' in attrs
 
 
-def test_register_has_success_step_with_existing_augustin_and_real_destination():
+def test_register_keeps_rich_success_step_with_real_destination():
     with TestClient(app) as client:
         response = client.get('/register')
     assert response.status_code == 200
     parsed = Elements(response.text)
     assert [attrs['data-register-step'] for _, attrs in parsed.nodes if 'data-register-step' in attrs] == ['1', '2', '3', '4', '5']
-    tag, attrs = parsed.by_id('register-success-title')
+    tag, attrs = parsed.by_id('register-complete-title')
     assert tag == 'h1' and attrs.get('tabindex') == '-1'
     assert any(tag == 'a' and 'data-register-goto' in attrs and attrs.get('href') == '/dashboard' for tag, attrs in parsed.nodes)
-    assert any(tag == 'img' and 'augustin-neutral.webp' in attrs.get('src', '') and 'register-success__image' in attrs.get('class', '') for tag, attrs in parsed.nodes)
+    assert any(
+        tag == 'img'
+        and 'augustin-teacher-complete.webp' in attrs.get('src', '')
+        and 'augustin-student-complete.png' in attrs.get('data-student-src', '')
+        and 'register-complete__character' in attrs.get('class', '')
+        for tag, attrs in parsed.nodes
+    )
     assert not any(attrs.get('name') == 'last_name' for _, attrs in parsed.nodes)
     for identifier in ('register-password-error', 'register-password-confirmation-error'):
         assert parsed.by_id(identifier)[1].get('role') == 'alert'

@@ -20,6 +20,13 @@
   const passwordError = document.querySelector("[data-password-error]");
   const passwordConfirmationError = document.querySelector("[data-password-confirmation-error]");
   const passwordSubmit = passwordForm?.querySelector('button[type="submit"]');
+  const registerMain = document.querySelector(".register-main");
+  const loginPrompt = document.querySelector("[data-register-login]");
+  const completeName = document.querySelector("[data-register-complete-name]");
+  const completeDescription = document.querySelector("[data-register-complete-description]");
+  const completeCharacter = document.querySelector("[data-register-complete-character]");
+  const completeLink = document.querySelector("[data-register-complete]")
+    || document.querySelector("[data-register-goto]");
   const passwordRequirements = new Map(
     [...document.querySelectorAll("[data-password-requirement]")].map(element => [
       element.dataset.passwordRequirement,
@@ -209,8 +216,30 @@
     });
   }
 
+  function syncCompleteStep() {
+    const role = registrationState.role === "student" ? "student" : "teacher";
+    const descriptions = {
+      student: "Теперь занятия, задания и материалы всегда будут под рукой.",
+      teacher: "Теперь можно собрать занятия, учеников и материалы в одном месте.",
+    };
+    const alternativeText = {
+      student: "Августин с рюкзаком и тетрадью",
+      teacher: "Августин в очках, с книгой и указкой",
+    };
+
+    if (registerMain) registerMain.dataset.completeRole = role;
+    if (completeName) completeName.textContent = String(registrationState.name || "").trim();
+    if (completeDescription) completeDescription.textContent = descriptions[role];
+    if (completeCharacter) {
+      completeCharacter.src = completeCharacter.dataset[`${role}Src`];
+      completeCharacter.alt = alternativeText[role];
+    }
+  }
+
   function allowedStep(requested) {
-    if (registered) return 5;
+    if (registered) {
+      return Math.min(Math.max(Number.isInteger(requested) ? requested : 5, 1), 5);
+    }
     const maximum = getNameValidationError(registrationState.name) ? 2
       : getEmailValidationError(registrationState.email) ? 3 : 4;
     return Math.min(Math.max(Number.isInteger(requested) ? requested : 1, 1), maximum);
@@ -221,13 +250,18 @@
     registrationState.step = step;
     if (!registered) saveRegistrationState();
 
+    const isCompleteStep = step === 5;
+    registerMain?.classList.toggle("is-complete", isCompleteStep);
+    if (loginPrompt) loginPrompt.hidden = isCompleteStep;
+    if (isCompleteStep) syncCompleteStep();
+
     steps.forEach(element => {
       element.hidden = Number(element.dataset.registerStep) !== step;
     });
 
     progressItems.forEach(item => {
       const itemStep = Number(item.dataset.registerProgress);
-      const isComplete = !registered && itemStep < step;
+      const isComplete = itemStep < step;
       const node = item.querySelector(":scope > span");
       item.classList.toggle("is-complete", isComplete);
       item.classList.toggle("is-active", itemStep === step);
@@ -262,7 +296,9 @@
     } else if (mode === "push" && route !== currentRoute) {
       history.pushState(null, "", route);
     }
-    if (step === 1) roleForm.querySelector('input[name="role"]:checked')?.focus({ preventScroll: true });
+    if (step === 1 && mode !== "replace") {
+      roleForm.querySelector('input[name="role"]:checked')?.focus({ preventScroll: true });
+    }
     if (step === 5) document.querySelector("[data-register-success-title]")?.focus({ preventScroll: true });
 
     if (step === 2) nameInput?.focus({ preventScroll: true });
@@ -271,6 +307,41 @@
   }
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const routeElement = document.querySelector('.register-progress');
+  const routeCharacter = routeElement && window.TutorFlowRouteCharacter
+    ? new window.TutorFlowRouteCharacter(routeElement) : null;
+  let transitioning = false;
+
+  function transitionStep(step) {
+    if (transitioning || step === registrationState.step) return;
+    if (!routeCharacter) {
+      showStep(step);
+      return;
+    }
+
+    transitioning = true;
+    const wasInert = registerMain?.inert || false;
+    if (registerMain) {
+      registerMain.inert = true;
+      registerMain.setAttribute('aria-busy', 'true');
+    }
+    return routeCharacter.jump(step).then(() => {
+      // Restore interaction before showStep focuses the next field.
+      if (registerMain) registerMain.inert = wasInert;
+      showStep(step);
+      routeCharacter.snap(step);
+    }, () => {
+      // Decorative animation failures must never block registration navigation.
+      if (registerMain) registerMain.inert = wasInert;
+      showStep(step);
+    }).finally(() => {
+      if (registerMain) {
+        registerMain.inert = wasInert;
+        registerMain.removeAttribute('aria-busy');
+      }
+      transitioning = false;
+    });
+  }
   const characterMotions = new Map();
   const settleTimers = new Map();
 
@@ -381,12 +452,13 @@
 
   roleForm?.addEventListener("submit", event => {
     event.preventDefault();
+    if (transitioning) return;
     const selectedRole = roleForm.querySelector('input[name="role"]:checked');
     if (!selectedRole) return;
 
     registrationState.role = selectedRole.value;
     saveRegistrationState();
-    showStep(2);
+    transitionStep(2);
   });
 
   progressItems.forEach(item => {
@@ -394,7 +466,7 @@
     const returnToStep = () => {
       const itemStep = Number(item.dataset.registerProgress);
       if (itemStep >= registrationState.step) return;
-      showStep(itemStep);
+      transitionStep(itemStep);
     };
 
     node?.addEventListener("click", returnToStep);
@@ -449,6 +521,7 @@
 
   nameForm?.addEventListener("submit", event => {
     event.preventDefault();
+    if (transitioning) return;
     const name = nameInput.value.trim();
     const validationError = getNameValidationError(name);
 
@@ -465,7 +538,7 @@
     registrationState.name = name;
     saveRegistrationState();
     clearNameError();
-    showStep(3);
+    transitionStep(3);
   });
 
   if (emailInput && emailError && emailField) {
@@ -501,6 +574,7 @@
 
   emailForm?.addEventListener("submit", event => {
     event.preventDefault();
+    if (transitioning) return;
     const email = emailInput.value.trim();
     const validationError = getEmailValidationError(email);
 
@@ -518,7 +592,7 @@
     saveRegistrationState();
     clearEmailError();
     setEmailValidity(true);
-    showStep(4);
+    transitionStep(4);
   });
 
   if (passwordInput && passwordConfirmationInput && passwordError && passwordConfirmationError) {
@@ -567,6 +641,7 @@
 
   passwordForm?.addEventListener("submit", async event => {
     event.preventDefault();
+    if (transitioning) return;
     const password = passwordInput.value;
     const confirmation = passwordConfirmationInput.value;
     const confirmationValidationError = !confirmation ? "Повторите пароль" : getPasswordConfirmationError(password, confirmation);
@@ -629,11 +704,10 @@
       try { sessionStorage.removeItem(storageKey); } catch { /* Storage may be unavailable. */ }
       try { localStorage.removeItem(storageKey); } catch { /* Storage may be unavailable. */ }
       nameInput.value = emailInput.value = passwordInput.value = passwordConfirmationInput.value = "";
-      registrationState.name = registrationState.email = "";
       const destination = ["/dashboard", "/student/homework"].includes(data.redirect)
         ? data.redirect : submitted.role === "student" ? "/student/homework" : "/dashboard";
-      document.querySelector("[data-register-goto]")?.setAttribute("href", destination);
-      showStep(5);
+      completeLink?.setAttribute("href", destination);
+      await transitionStep(5);
     } catch {
       showStep(4);
       setPasswordFieldError(passwordInput, passwordError, "Проверьте соединение и попробуйте снова.");
@@ -668,7 +742,11 @@
   const initialStep = hashSteps.get(location.hash)
     || (Number.isInteger(storedStep) && storedStep >= 1 && storedStep <= 5 ? storedStep : 1);
   showStep(initialStep, "replace");
-  const syncRoute = () => showStep(hashSteps.get(location.hash) || 1, "sync");
+  routeCharacter?.snap(registrationState.step);
+  const syncRoute = () => {
+    showStep(hashSteps.get(location.hash) || 1, "sync");
+    routeCharacter?.snap(registrationState.step);
+  };
   window.addEventListener("popstate", syncRoute);
   window.addEventListener("hashchange", syncRoute);
 })();
