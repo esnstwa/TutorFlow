@@ -9,3 +9,4 @@ var/uploads/
 build/
 *.egg-info/
 tutorflow.local.db
+tmp/

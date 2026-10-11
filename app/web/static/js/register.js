@@ -237,7 +237,9 @@
   }
 
   function allowedStep(requested) {
-    if (registered) return 5;
+    if (registered) {
+      return Math.min(Math.max(Number.isInteger(requested) ? requested : 5, 1), 5);
+    }
     const maximum = getNameValidationError(registrationState.name) ? 2
       : getEmailValidationError(registrationState.email) ? 3 : 4;
     return Math.min(Math.max(Number.isInteger(requested) ? requested : 1, 1), maximum);
@@ -259,7 +261,7 @@
 
     progressItems.forEach(item => {
       const itemStep = Number(item.dataset.registerProgress);
-      const isComplete = !registered && itemStep < step;
+      const isComplete = itemStep < step;
       const node = item.querySelector(":scope > span");
       item.classList.toggle("is-complete", isComplete);
       item.classList.toggle("is-active", itemStep === step);
@@ -294,7 +296,9 @@
     } else if (mode === "push" && route !== currentRoute) {
       history.pushState(null, "", route);
     }
-    if (step === 1) roleForm.querySelector('input[name="role"]:checked')?.focus({ preventScroll: true });
+    if (step === 1 && mode !== "replace") {
+      roleForm.querySelector('input[name="role"]:checked')?.focus({ preventScroll: true });
+    }
     if (step === 5) document.querySelector("[data-register-success-title]")?.focus({ preventScroll: true });
 
     if (step === 2) nameInput?.focus({ preventScroll: true });

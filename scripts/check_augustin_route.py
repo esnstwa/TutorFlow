@@ -56,9 +56,12 @@ def jump(page, selector, target, *, rapid=False, resize=False, reduced=False):
       window.routeSamples = [];
       window.routeDone = new Promise(resolve => {
         const started = performance.now();
+        let sawBusy = false;
         const tick = () => {
           routeSamples.push({...routeSample(), time:performance.now()-started});
-          if (document.querySelector('.register-main').inert) requestAnimationFrame(tick);
+          const busy = document.querySelector('.register-main').inert;
+          sawBusy ||= busy;
+          if (!sawBusy || busy) requestAnimationFrame(tick);
           else resolve(routeSamples);
         };
         const element = document.querySelector(selector);
@@ -138,6 +141,11 @@ def jump(page, selector, target, *, rapid=False, resize=False, reduced=False):
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(channel='msedge', headless=True)
     page = browser.new_page(viewport={'width': 1440, 'height': 900})
+    page.route('**/api/auth/register', lambda route: route.fulfill(
+        status=201,
+        content_type='application/json',
+        body='{"ok":true,"redirect":"/dashboard"}',
+    ))
     errors = []
     route_requests = []
     page.on('pageerror', lambda error: errors.append(str(error)))
@@ -146,6 +154,15 @@ with sync_playwright() as playwright:
     page.goto(URL)
     page.wait_for_function("document.querySelectorAll('.register-route-character img').length === 1 && document.querySelector('.register-route-character__sprite').naturalWidth === 221 && document.querySelector('[data-route-character-mood]').dataset.routeCharacterMood === 'idle'")
     page.wait_for_timeout(100)
+    selected_input = page.locator('.role-card input:checked')
+    assert selected_input.evaluate('e => !e.matches(":focus-visible")')
+    selected_surface = page.locator('.role-card input:checked + .role-card__surface')
+    assert selected_surface.evaluate('e => getComputedStyle(e).outlineStyle') == 'none'
+    selected_input.press('Space')
+    assert selected_input.evaluate('e => e.matches(":focus-visible")')
+    assert selected_surface.locator('.role-card__indicator').evaluate(
+        'e => getComputedStyle(e).boxShadow != "none"'
+    )
     sprite = page.locator('.register-route-character__sprite')
     assert sprite.evaluate("e => ({opacity:getComputedStyle(e).opacity, transition:getComputedStyle(e).transitionDuration, transitionProperty:getComputedStyle(e).transitionProperty, display:getComputedStyle(e).display, willChange:getComputedStyle(e).willChange, backfaceVisibility:getComputedStyle(e).backfaceVisibility, width:e.getAttribute('width'), height:e.getAttribute('height'), naturalWidth:e.naturalWidth, naturalHeight:e.naturalHeight})") == {
         'opacity': '1', 'transition': '0s', 'transitionProperty': 'none', 'display': 'block',
@@ -184,10 +201,24 @@ with sync_playwright() as playwright:
     jump(page, '[data-password-form]', 5, rapid=True)
     page.wait_for_timeout(900)
     at_step(page, 5)
+    assert page.locator('[data-register-success-title]').evaluate(
+        'e => getComputedStyle(e).outlineStyle == "none"'
+    )
+    flag = page.locator('.register-progress__flag')
+    assert flag.locator('path').evaluate(
+        'e => getComputedStyle(e).stroke == "rgb(24, 60, 255)"'
+    )
+    assert flag.evaluate('e => getComputedStyle(e).animationName.includes("register-flag-sway")')
     page.screenshot(path=str(QA / 'success-desktop.png'))
     jump(page, '[data-register-progress="4"] > span', 4)
+    page.wait_for_timeout(360)
+    assert flag.locator('path').evaluate(
+        'e => getComputedStyle(e).stroke == "rgb(213, 218, 228)"'
+    )
+    assert flag.evaluate('e => getComputedStyle(e).animationName == "none"')
     jump(page, '[data-register-progress="3"] > span', 3, resize=True)
     jump(page, '[data-register-progress="2"] > span', 2)
+    page.locator('#register-name').fill('Анна')
     jump(page, '[data-name-form]', 3)
     page.screenshot(path=str(QA / 'mobile.png'), full_page=True)
     for width in (320, 375, 768, 1024, 1440):

@@ -59,6 +59,8 @@ test('registration waits for real success, sends contract once and clears only r
   assert.equal(f.sessionStorage.getItem('tutorflow.registration'),null);
   assert.equal(f.sessionStorage.getItem('invite'),'preserve'); assert.equal(f.node('#register-password').value,'');
   assert.equal(f.node('#register-password-confirmation').value,'');
+  await f.back(); assert.equal(active(f),4);
+  await f.forward(); assert.equal(active(f),5);
 });
 test('duplicate email routes to step 3; 422 fields route to their inputs; network stays on password alert', async () => {
   for (const [status,fields,step,selector,message] of [[409,{email:'Почта занята'},3,'[data-email-error]','Почта занята'],[422,{first_name:'Ошибка имени'},2,'[data-name-error]','Ошибка имени'],[422,{password_confirmation:'Не совпадает'},4,'[data-password-confirmation-error]','Не совпадает']]) {

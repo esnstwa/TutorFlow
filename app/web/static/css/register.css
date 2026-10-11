@@ -201,6 +201,8 @@ body {
   width: clamp(1.35rem, 2.3vw, 2.2rem);
   height: clamp(1.95rem, 3.3vw, 3.15rem);
   transform: translateY(-50%);
+  transform-box: fill-box;
+  transform-origin: 18% 88%;
 }
 
 .register-progress__flag path {
@@ -209,6 +211,17 @@ body {
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: stroke 320ms ease;
+}
+
+.register-progress li.is-active .register-progress__flag {
+  animation:
+    register-flag-arrive 560ms cubic-bezier(.2, .8, .25, 1) both,
+    register-flag-sway 2.1s ease-in-out 560ms infinite alternate;
+}
+
+.register-progress li.is-active .register-progress__flag path {
+  stroke: var(--register-blue);
 }
 
 .register-intro {
@@ -300,6 +313,10 @@ body {
 
 .register-complete__intro {
   margin-top: var(--register-flow-gap);
+}
+
+[data-register-success-title]:focus {
+  outline: none;
 }
 
 .register-step--complete {
@@ -605,8 +622,11 @@ body {
 }
 
 .role-card input:focus-visible + .role-card__surface {
-  outline: 3px solid rgba(24, 60, 255, .28);
-  outline-offset: 4px;
+  outline: none;
+}
+
+.role-card input:focus-visible + .role-card__surface .role-card__indicator {
+  box-shadow: 0 0 0 .22rem rgba(24, 60, 255, .22);
 }
 
 .role-card input:checked + .role-card__surface {
@@ -630,7 +650,7 @@ body {
   justify-content: center;
   background: transparent;
   color: #fff;
-  transition: border-color 200ms ease, background-color 200ms ease;
+  transition: border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease;
 }
 
 .role-card__indicator svg {
@@ -904,8 +924,33 @@ body {
   }
 
   .register-complete__stage,
-  .register-complete__character {
+  .register-complete__character,
+  .register-progress li.is-active .register-progress__flag {
     animation: none !important;
+  }
+}
+
+@keyframes register-flag-arrive {
+  0% {
+    transform: translateY(-50%) rotate(0);
+  }
+
+  55% {
+    transform: translateY(-50%) rotate(-5deg);
+  }
+
+  100% {
+    transform: translateY(-50%) rotate(1.5deg);
+  }
+}
+
+@keyframes register-flag-sway {
+  from {
+    transform: translateY(-50%) rotate(1.5deg);
+  }
+
+  to {
+    transform: translateY(-50%) rotate(-1.5deg);
   }
 }
 
