@@ -1,9 +1,12 @@
 """PZ-02 tests owned by Kseniya for registration contracts.
 
-These are schema-level tests. Existing auth integration/session tests cover the
-already-proven persistence, cookie, CSRF, login/logout, and role-routing paths;
-this file adds the missing boundary and malformed-input matrix without touching
-shared fixtures or seed data.
+These are schema-level tests. Role scenarios trace the accepted FR-01 role
+contract; name, password, confirmation, and email-boundary scenarios are
+explicit characterization tests for the current schema where Requirements 1.0
+does not define a product oracle. Existing auth integration/session tests cover
+the already-proven persistence, cookie, CSRF, login/logout, and role-routing
+paths; this file adds the missing boundary and malformed-input matrix without
+touching shared fixtures or seed data.
 """
 
 from __future__ import annotations
@@ -75,27 +78,26 @@ def test_reg_invalid_or_missing_role_is_rejected(role: object) -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "case_id"),
+    "name",
     [
-        pytest.param(INVALID_NAMES["length_1"], "TC-REG-05", id="TC-REG-05-name-length-1"),
-        pytest.param(VALID_NAMES["length_2"], "TC-REG-06", id="TC-REG-06-name-length-2"),
-        pytest.param(VALID_NAMES["length_30"], "TC-REG-07", id="TC-REG-07-name-length-30"),
-        pytest.param(INVALID_NAMES["length_31"], "TC-REG-08", id="TC-REG-08-name-length-31"),
+        pytest.param(INVALID_NAMES["length_1"], id="TC-REG-05-name-length-1"),
+        pytest.param(VALID_NAMES["length_2"], id="TC-REG-06-name-length-2"),
+        pytest.param(VALID_NAMES["length_30"], id="TC-REG-07-name-length-30"),
+        pytest.param(INVALID_NAMES["length_31"], id="TC-REG-08-name-length-31"),
     ],
 )
-def test_reg_name_length_boundary_matches_schema_contract(name: str, case_id: str) -> None:
-    """TC-REG-05..08: check the backend 2..30 schema boundary.
+def test_reg_schema_characterization_name_length(name: str) -> None:
+    """TC-REG-05..08: characterize the current backend name boundary.
 
-    The 31-character case checks only RegisterRequest. It deliberately does not
-    assert what the browser should do, because register.js currently truncates
-    user input and the product UX contract is unresolved.
+    Requirements 1.0 does not define a 2..30 product rule. The 31-character
+    case therefore checks only current RegisterRequest behavior and deliberately
+    does not assert what the browser should do.
     """
     if len(name) in {2, 30}:
         request = RegisterRequest.model_validate(_payload(first_name=name))
         assert request.first_name == name
     else:
         _assert_invalid(_payload(first_name=name), "first_name")
-    assert case_id.startswith("TC-REG-")
 
 
 @pytest.mark.parametrize(
@@ -121,8 +123,11 @@ def test_reg_name_accepts_one_hyphen_between_nonempty_parts(name: str) -> None:
         pytest.param(INVALID_NAMES["latin"], id="TC-REG-14-latin-name"),
     ],
 )
-def test_reg_invalid_name_alphabet_or_hyphen_shape_is_rejected(name: str) -> None:
-    """TC-REG-10..14: invalid alphabet and hyphen classes fail validation."""
+def test_reg_schema_characterization_name_alphabet_or_hyphen(name: str) -> None:
+    """TC-REG-10..14: characterize current alphabet and hyphen rules.
+
+    These restrictions are not independently specified in Requirements 1.0.
+    """
     _assert_invalid(_payload(first_name=name), "first_name")
 
 
@@ -135,8 +140,12 @@ def test_reg_invalid_name_alphabet_or_hyphen_shape_is_rejected(name: str) -> Non
         pytest.param(PASSWORDS["length_129"], False, id="TC-REG-18-password-length-129"),
     ],
 )
-def test_reg_password_length_boundary(password: str, is_valid: bool) -> None:
-    """TC-REG-15..18: password length is 8..128 characters."""
+def test_reg_schema_characterization_password_length(password: str, is_valid: bool) -> None:
+    """TC-REG-15..18: characterize the current 8..128 password boundary.
+
+    Requirements 1.0 requires Argon2 hashing but does not define this length
+    policy as a product rule.
+    """
     payload = _payload(password=password, password_confirmation=password)
 
     if is_valid:
@@ -153,8 +162,11 @@ def test_reg_password_length_boundary(password: str, is_valid: bool) -> None:
         pytest.param(PASSWORDS["without_digit"], id="TC-REG-20-no-digit"),
     ],
 )
-def test_reg_password_requires_letter_and_digit(password: str) -> None:
-    """TC-REG-19..20: composition validator rejects incomplete passwords."""
+def test_reg_schema_characterization_password_composition(password: str) -> None:
+    """TC-REG-19..20: characterize the current composition validator.
+
+    Requirements 1.0 does not define the required letter-and-digit policy.
+    """
     _assert_invalid(
         _payload(password=password, password_confirmation=password),
         "password",
@@ -169,8 +181,11 @@ def test_reg_password_requires_letter_and_digit(password: str) -> None:
         pytest.param(CONFIRMATIONS["empty"], False, id="TC-REG-23-confirmation-empty"),
     ],
 )
-def test_reg_password_confirmation_contract(confirmation: str, is_valid: bool) -> None:
-    """TC-REG-21..23: confirmation must equal the password."""
+def test_reg_schema_characterization_password_confirmation(confirmation: str, is_valid: bool) -> None:
+    """TC-REG-21..23: characterize the current confirmation validator.
+
+    Requirements 1.0 does not independently require a confirmation field.
+    """
     payload = _payload(password=PASSWORDS["valid"], password_confirmation=confirmation)
 
     if is_valid:
@@ -188,11 +203,12 @@ def test_reg_password_confirmation_contract(confirmation: str, is_valid: bool) -
         pytest.param(EMAIL_BOUNDARIES[255], False, id="TC-REG-26-email-length-255"),
     ],
 )
-def test_reg_email_length_technical_schema_boundary(email: str, is_valid: bool) -> None:
-    """TC-REG-24..26: verify EmailStr's technical 254-character boundary.
+def test_reg_schema_characterization_email_length(email: str, is_valid: bool) -> None:
+    """TC-REG-24..26: characterize EmailStr's technical boundary.
 
-    PZ-01 does not define a separate product email-length requirement, so this
-    test documents the current schema contract rather than inventing a new FR.
+    Requirements 1.0 does not define a separate product email-length
+    requirement, so this test documents current schema behavior rather than
+    inventing a new FR.
     """
     payload = _payload(email=email)
 
