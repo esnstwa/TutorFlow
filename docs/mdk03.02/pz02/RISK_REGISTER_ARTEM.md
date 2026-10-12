@@ -2,7 +2,7 @@
 
 **Область:** FR-07 и связанные FR-03, FR-16, NFR-02. **Источники:** [Requirements 1.0](../pz01/REQUIREMENTS.md), [TEST_CASES_ARTEM.md](TEST_CASES_ARTEM.md), [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md), [MUTATION_ARTEM.md](MUTATION_ARTEM.md), `app/services.py`, `app/web/router.py`, `app/models.py` и фактические результаты наборов.
 
-**Границы доказательства:** ранее задокументировано 31 PASS из 31 собранной проверки; мутационный опыт A-SCH-04 дал поведенческий FAIL, после восстановления — 31 PASS. Финальный повторный аудит и результаты его запусков приведены ниже. Фикстура использует отдельную in-memory SQLite на каждый тест, подменяет `get_db` и `get_current_teacher`, поэтому не проверяет реальный вход/сессию/CSRF расписания. PostgreSQL CI проверяет миграции, не расписательные сценарии. GitHub Actions для локальных изменений не запускался.
+**Границы доказательства:** ранее задокументировано 31 PASS из 31 собранной проверки; мутационный опыт A-SCH-04 дал поведенческий FAIL, после восстановления — 31 PASS. Финальный повторный аудит и результаты его запусков приведены ниже. Фикстура использует отдельную in-memory SQLite на каждый тест, подменяет `get_db` и `get_current_teacher`, поэтому не проверяет реальный вход/сессию/CSRF расписания. PostgreSQL CI проверяет миграции, не расписательные сценарии. Для опубликованного коммита `54bf940b9e428fb4eae92a4488059542451055eb` GitHub Actions run [#38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377) завершился успешно (`verify` — `Success`).
 
 ## Матрица и правила оценки
 
@@ -107,7 +107,7 @@
 
 - Полный `pytest -q` включает индивидуальный файл расписания; отдельный coverage-шаг запускает именно `tests/test_schedule_pz02.py`. Отчёт покрытия отмечает 100% строк и conditional branch arcs в выделенных диапазонах, но эти цифры не доказывают корректность внешней БД, конкурентность или реальную авторизацию.
 - Фокусный набор действительно снижает риски invalid interval, обычного foreign/archived student, последовательного пересечения, основных путей переноса и ряда отказов/rollback. Мутационный результат отдельно подтверждает чувствительность A-SCH-04 к удалению teacher-scope фильтра.
-- Конфигурация workflow описана, но GitHub Actions для текущих локальных изменений здесь не запускался; прошлые локальные PASS не называть CI run.
+- Для опубликованного SHA `54bf940b9e428fb4eae92a4488059542451055eb` GitHub Actions `verify` завершился успешно ([run #38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377)). Приведённые выше PASS — результаты локальных прогонов, не следует выдавать их за отдельные численные логи CI.
 
 Команды для воспроизведения наборов из корня репозитория:
 
@@ -129,7 +129,7 @@ node tests/test_session_fetch.cjs
 - **R-SCH-07:** A-SCH-09/12 не реализованы и не имеют статуса PASS/FAIL; существующие тесты не снижают риск расхождения продуктовой политики.
 - **R-SCH-08:** прямой расписательной проверки реальной cookie/CSRF/role нет; нужен A-SCH-21. Отдельные auth-тесты не заменяют интеграцию с расписательным маршрутом.
 
-Финальная проверка аудита 2026-10-12: индивидуальный pytest — 31 PASS (1 Starlette deprecation warning); полный pytest — 217 PASS (1 warning); JavaScript — 34 PASS; session-fetch — 6 PASS. Локальные TOML/YAML и структурные проверки workflow прошли, `pip check` и `pip install --dry-run -e '.[dev]'` успешны. Мажоры Actions проверены по официальным release/metadata (Node 24); `actionlint` отсутствует. Удалённый GitHub Actions run не запускался.
+Финальная проверка аудита 2026-10-12: индивидуальный pytest — 31 PASS (1 Starlette deprecation warning); полный pytest — 217 PASS (1 warning); JavaScript — 34 PASS; session-fetch — 6 PASS. Локальные TOML/YAML и структурные проверки workflow прошли, `pip check` и `pip install --dry-run -e '.[dev]'` успешны. Мажоры Actions проверены по официальным release/metadata (Node 24); `actionlint` отсутствует. Для опубликованного коммита `54bf940b9e428fb4eae92a4488059542451055eb` удалённый run [#38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377) завершился успешно; отдельный PostgreSQL расписательный integration test в workflow не выполняется.
 
 ### Для реальной интеграционной среды
 

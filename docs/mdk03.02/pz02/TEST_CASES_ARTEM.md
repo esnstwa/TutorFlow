@@ -172,7 +172,7 @@ COVERAGE_FILE='C:/Users/gdddg/AppData/Local/hermes/cache/scratch/.coverage-sched
 217 passed, 0 failed, 0 skipped, 1 warning (12.93s)
 ```
 
-Запуски предыдущего coverage-этапа выполнены 2026-10-12 на Windows 11/Python 3.12.10. Предупреждение — Starlette о deprecated-интеграции `httpx` с `starlette.testclient`; production-код не менялся. Локальный coverage command измеряет только `tests/test_schedule_pz02.py`. Детальные итоги модулей и целевых участков — в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). CI локально/удалённо не запускался.
+Запуски предыдущего coverage-этапа выполнены 2026-10-12 на Windows 11/Python 3.12.10. Предупреждение — Starlette о deprecated-интеграции `httpx` с `starlette.testclient`; production-код не менялся. Локальный coverage command измеряет только `tests/test_schedule_pz02.py`; это локальный запуск, не CI. Детальные итоги модулей и целевых участков — в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Позже для опубликованного коммита `54bf940b9e428fb4eae92a4488059542451055eb` workflow `verify` завершился успешно ([run #38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377)).
 
 ### Повторная проверка финального аудита (2026-10-12)
 
@@ -190,4 +190,4 @@ node tests/test_session_fetch.cjs
 6 session fetch checks passed
 ```
 
-Предупреждение pytest в обоих Python-прогонах: deprecated-интеграция `httpx`/`starlette.testclient`; exit code обоих прогонов — 0. CI задан на Node 24; локальный Node для этих JS-запусков — 26.7.0. Эти результаты относятся к текущему рабочему дереву; GitHub Actions не запускался.
+Предупреждение pytest в обоих Python-прогонах: deprecated-интеграция `httpx`/`starlette.testclient`; exit code обоих прогонов — 0. CI задан на Node 24; локальный Node для этих JS-запусков — 26.7.0. Эти результаты относятся к локальному рабочему дереву на момент прогона. Отдельный GitHub Actions run для опубликованного SHA `54bf940b9e428fb4eae92a4488059542451055eb` завершился успешно ([run #38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377)).
