@@ -36,14 +36,14 @@ jobs:
       FILE_STORAGE_PATH: /tmp/tutorflow-uploads
       TMPDIR: /tmp
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Install Python dependencies
         run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
       - name: Compile Python sources
@@ -60,3 +60,21 @@ jobs:
           test "$(python -m alembic heads | grep -c '(head)')" -eq 1
           python -m alembic current
           python -m alembic check
+      - name: Measure Artyom schedule coverage
+        run: >-
+          python -m pytest tests/test_schedule_pz02.py -q
+          --cov=app.services
+          --cov=app.web.router
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=xml:coverage-artem.xml
+          --cov-report=json:coverage-artem.json
+      - name: Upload Artyom schedule coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-artem
+          path: |
+            coverage-artem.xml
+            coverage-artem.json
+          if-no-files-found: warn

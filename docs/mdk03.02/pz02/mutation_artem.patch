@@ -1,0 +1,6 @@
+diff --git a/app/services.py b/app/services.py
+--- a/app/services.py
++++ b/app/services.py
+@@ -182,1 +182,1 @@ def scoped_student(db: Session, teacher_id: int, student_id: int) -> Student | None:
+-    return db.scalar(select(Student).options(selectinload(Student.user)).where(Student.id == student_id, Student.teacher_id == teacher_id))
++    return db.scalar(select(Student).options(selectinload(Student.user)).where(Student.id == student_id))

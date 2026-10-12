@@ -312,9 +312,15 @@ def create_entity(db: Session, teacher: User, kind: str, payload: dict[str, Any]
         status = str(payload.get("status", "scheduled"))
         if status not in LESSON_STATUSES:
             raise ValueError("Неизвестный статус занятия")
+        topic = str(payload.get("topic") or "").strip()
+        if not topic:
+            raise ValueError("Укажите тему занятия")
+        teacher_note = str(payload.get("teacher_note", ""))
+        if len(teacher_note) > 500:
+            raise ValueError("Заметка не должна превышать 500 символов")
         location = str(payload.get("location", "Онлайн · TutorFlow")).strip()
         meeting_url = str(payload.get("meeting_url", "")).strip() or None
-        item = Lesson(teacher_id=teacher.id, student_id=student.id, subject=str(payload.get("subject") or student.subject), topic=str(payload["topic"]).strip(), start_at=start_at, end_at=end_at, location=location, meeting_url=meeting_url, teacher_note=str(payload.get("teacher_note", "")), status=status)
+        item = Lesson(teacher_id=teacher.id, student_id=student.id, subject=str(payload.get("subject") or student.subject), topic=topic, start_at=start_at, end_at=end_at, location=location, meeting_url=meeting_url, teacher_note=teacher_note, status=status)
         db.add(item)
         db.flush()
         item.student = student
