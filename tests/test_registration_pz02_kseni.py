@@ -217,3 +217,19 @@ def test_reg_non_object_or_incomplete_input_is_rejected(payload: object) -> None
     """TC-REG-27..31: malformed structures cannot form a registration request."""
     with pytest.raises((ValidationError, TypeError)):
         RegisterRequest.model_validate(payload)
+
+
+def test_reg_numeric_email_is_rejected_with_email_error() -> None:
+    """TC-REG-32: a numeric email value is rejected on the email field."""
+    with pytest.raises(ValidationError) as raised:
+        RegisterRequest.model_validate(_payload(email=123))
+
+    assert _error_fields(raised.value) == {"email"}
+
+
+def test_reg_empty_first_name_is_rejected_with_first_name_error() -> None:
+    """TC-REG-33: an empty first name is rejected on the first_name field."""
+    with pytest.raises(ValidationError) as raised:
+        RegisterRequest.model_validate(_payload(first_name=""))
+
+    assert _error_fields(raised.value) == {"first_name"}
