@@ -50,6 +50,16 @@ jobs:
         run: python -m compileall -q app
       - name: Run Python tests
         run: python -m pytest -q
+      - name: Run JavaScript tests
+        run: |
+          node --test tests/auth-wizard.test.cjs tests/student-lifecycle.test.cjs
+          node tests/test_session_fetch.cjs
+      - name: Validate migrations on PostgreSQL
+        run: |
+          python -m alembic upgrade head
+          test "$(python -m alembic heads | grep -c '(head)')" -eq 1
+          python -m alembic current
+          python -m alembic check
       - name: Measure Artyom schedule coverage
         run: >-
           python -m pytest tests/test_schedule_pz02.py -q
@@ -68,13 +78,3 @@ jobs:
             coverage-artem.xml
             coverage-artem.json
           if-no-files-found: warn
-      - name: Run JavaScript tests
-        run: |
-          node --test tests/auth-wizard.test.cjs tests/student-lifecycle.test.cjs
-          node tests/test_session_fetch.cjs
-      - name: Validate migrations on PostgreSQL
-        run: |
-          python -m alembic upgrade head
-          test "$(python -m alembic heads | grep -c '(head)')" -eq 1
-          python -m alembic current
-          python -m alembic check

@@ -33,47 +33,49 @@ diff --git a/app/services.py b/app/services.py
 +    return db.scalar(select(Student).options(selectinload(Student.user)).where(Student.id == student_id))
 ```
 
-Проверка применимости: `patch --dry-run -p1 < docs/mdk03.02/pz02/mutation_artem.patch` успешно проверила файл без его изменения. `git apply --check` в текущем Windows checkout не сопоставил LF patch с CRLF-файлом `app/services.py`; поэтому patch dry-run проверен GNU `patch`.
+После изменений валидации `create_entity` повторно выполнен `patch --dry-run -p1 < docs/mdk03.02/pz02/mutation_artem.patch`: файл проверен успешно, без изменения рабочего дерева. Мутация остаётся привязана только к фильтру `scoped_student` и не пересекается с новым кодом валидации создания. Ранее `git apply --check` в этом Windows checkout не сопоставил LF patch с CRLF-файлом `app/services.py`; поэтому применимость подтверждена GNU `patch`.
 
-Копия находилась в `C:/Users/gdddg/AppData/Local/hermes/cache/scratch/TutorFlow-mutation-artem`; `.git` и `.venv` не копировались. Запуски использовали оригинальный venv, но `PYTHONPATH` и `cwd` указывали на копию. Импорт был проверен: `app.services.__file__` указывал на файл в scratch-копии. Сравнение diff подтвердило ровно одну изменённую строку; test SHA копии совпал с исходным.
+Изолированная копия находилась в отдельном временном каталоге Hermes scratch; `.git` и `.venv` не копировались. Запуски выполнялись из корня этой копии с активированным виртуальным окружением проекта, а импорт проверялся через `app.services.__file__`, который указывал на файл внутри копии. Сравнение diff подтвердило ровно одну изменённую строку; SHA тестового файла в историческом эксперименте совпадал с исходным.
 
 ## Команды и фактические результаты
 
-Окружение: Windows 11, Python 3.12.10, pytest 8.4.2. Во всех pytest-запусках присутствовало одно предупреждение Starlette о deprecated-интеграции `httpx`/`starlette.testclient`; оно не влияло на exit status.
+Окружение: Windows 11, Python 3.12.10, pytest 8.4.2. Во всех pytest-запусках присутствовало одно предупреждение Starlette о deprecated-интеграции `httpx`/`starlette.testclient`; оно не влияло на exit status. Команды ниже нормализованы и предполагают активированное окружение проекта; для mutation-ветки их следует запускать из корня изолированной копии. Числа и выводы далее — исторические результаты исходного эксперимента, не повторный запуск после исправлений по ревью.
 
 ### Исходная логика — рабочее дерево
 
 ```text
-./.venv/Scripts/python.exe -m pytest 'tests/test_schedule_pz02.py::test_a_sch_04_05_reject_foreign_or_archived_student[foreign]' -q -vv
+python -m pytest 'tests/test_schedule_pz02.py::test_a_sch_04_05_reject_foreign_or_archived_student[foreign]' -q -vv
 1 passed, 1 warning
 
-./.venv/Scripts/python.exe -m pytest tests/test_schedule_pz02.py -q
+python -m pytest tests/test_schedule_pz02.py -q
 31 passed, 0 failed, 0 skipped, 1 warning
 ```
 
 ### Искусственный дефект — только scratch-копия
 
 ```text
-PYTHONPATH='C:/Users/gdddg/AppData/Local/hermes/cache/scratch/TutorFlow-mutation-artem' C:/Users/gdddg/Projects/TutorFlow/.venv/Scripts/python.exe -m pytest 'tests/test_schedule_pz02.py::test_a_sch_04_05_reject_foreign_or_archived_student[foreign]' -q -vv
+python -m pytest 'tests/test_schedule_pz02.py::test_a_sch_04_05_reject_foreign_or_archived_student[foreign]' -q -vv
 FAILED: `assert response.status_code >= 400`
        `actual: 200 >= 400` (`Response [200 OK]`)
 1 failed, 1 warning (0.50s)
 
-PYTHONPATH='C:/Users/gdddg/AppData/Local/hermes/cache/scratch/TutorFlow-mutation-artem' C:/Users/gdddg/Projects/TutorFlow/.venv/Scripts/python.exe -m pytest tests/test_schedule_pz02.py -q
+python -m pytest tests/test_schedule_pz02.py -q
 1 failed, 30 passed, 1 warning (2.35s)
 ```
 
-Это поведенческий FAIL: endpoint вернул **HTTP 200**, хотя FR-07 требует отказ для чужого ученика. Assertion сработал на статусе ответа (тест `tests/test_schedule_pz02.py:164`), а не на импорте, сборке или DB-ошибке.
+Строка `assert response.status_code >= 400` в выводе выше — исторический assertion экспериментального прогона; в актуальном `tests/test_schedule_pz02.py` он заменён на диапазон `400 <= status_code < 500` и проверку контролируемого `detail`. Старый вывод сохранён как evidence исходного mutation-эксперимента, не как новый прогон.
+
+Это поведенческий FAIL: endpoint вернул **HTTP 200**, хотя FR-07 требует отказ для чужого ученика. Assertion сработал на статусе ответа (в исторической версии теста `tests/test_schedule_pz02.py:164`), а не на импорте, сборке или DB-ошибке.
 
 Дополнительная проверка тем же фикстурным состоянием в копии подтвердила успешную запись: `MUTANT_RESPONSE_STATUS=200`, `LESSON_COUNT=1`, сохранённые `teacher_id=1`, `student_id=4` (ожидаемые ID совпали). Валидный FK не блокировал вставку; mutation действительно обошёл только проверку владельца.
 
 ### После эксперимента — восстановленное рабочее дерево
 
 ```text
-./.venv/Scripts/python.exe -m pytest 'tests/test_schedule_pz02.py::test_a_sch_04_05_reject_foreign_or_archived_student[foreign]' -q -vv
+python -m pytest 'tests/test_schedule_pz02.py::test_a_sch_04_05_reject_foreign_or_archived_student[foreign]' -q -vv
 1 passed, 1 warning (0.18s)
 
-./.venv/Scripts/python.exe -m pytest tests/test_schedule_pz02.py -q
+python -m pytest tests/test_schedule_pz02.py -q
 31 passed, 0 failed, 0 skipped, 1 warning (2.05s)
 ```
 

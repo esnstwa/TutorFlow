@@ -161,7 +161,8 @@ def test_a_sch_04_05_reject_foreign_or_archived_student(schedule_case, student_k
     case = schedule_case
     before = lesson_count(case)
     response = create_lesson(case, student_id=case[student_key])
-    assert response.status_code >= 400
+    assert 400 <= response.status_code < 500
+    assert response.json()["detail"] == "Ученик не найден"
     assert lesson_count(case) == before
 
 
@@ -358,6 +359,48 @@ def test_a_sch_15_missing_required_create_field_does_not_insert(schedule_case):
     response = case["client"].post("/api/lessons", json=payload)
     assert response.status_code == 422
     assert lesson_count(case) == before
+
+
+@pytest.mark.parametrize("topic", ["", " \t\n "], ids=["empty", "whitespace-only"])
+def test_a_sch_25_direct_create_rejects_blank_topic(schedule_case, topic):
+    """A-SCH-25 / FR-07: direct lesson creation rejects a blank topic."""
+    case = schedule_case
+    payload = lesson_payload(case["active_student_id"])
+    payload["topic"] = topic
+    before = lesson_count(case)
+
+    response = case["client"].post("/api/lessons", json=payload)
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Укажите тему занятия"
+    assert lesson_count(case) == before
+
+
+@pytest.mark.parametrize(
+    ("note_length", "expected_status"),
+    [(0, 200), (500, 200), (501, 422)],
+    ids=["empty-note", "maximum-500", "over-maximum-501"],
+)
+def test_a_sch_26_direct_create_enforces_teacher_note_limit(schedule_case, note_length, expected_status):
+    """A-SCH-26 / FR-07: direct creation enforces the 500-character note limit."""
+    case = schedule_case
+    payload = lesson_payload(case["active_student_id"])
+    payload["teacher_note"] = "x" * note_length
+    before = lesson_count(case)
+
+    response = case["client"].post("/api/lessons", json=payload)
+    if expected_status == 422:
+        assert 400 <= response.status_code < 500
+        assert response.json()["detail"] == "Заметка не должна превышать 500 символов"
+        assert lesson_count(case) == before
+        return
+
+    assert response.status_code == 200, response.text
+    lesson_id = response.json()["lesson"]["id"]
+    assert lesson_count(case) == before + 1
+    with case["session_factory"]() as db:
+        saved = db.get(Lesson, lesson_id)
+        assert saved is not None
+        assert saved.teacher_note == payload["teacher_note"]
 
 
 def test_a_sch_16_reschedule_missing_start_preserves_original_interval(schedule_case):

@@ -1,6 +1,6 @@
 # Анализ покрытия — расписание Артёма (ПЗ №2)
 
-**Дата:** 2026-10-12. **Область тестового запуска:** только `tests/test_schedule_pz02.py` (31 собранная проверка); никаких других pytest-тестов не участвовало в coverage-запуске.
+**Дата:** 2026-10-12. **Текущая область тестового запуска:** только `tests/test_schedule_pz02.py` (36 собранных вариантов); никаких других pytest-тестов не участвовало в coverage-запуске.
 **Риск-ориентированный пересмотр:** [RISK_REGISTER_ARTEM.md](RISK_REGISTER_ARTEM.md). Общий локальный `TEST_PLAN.md` не отслеживается Git; его замечание о pytest-cov/coverage — исторический baseline, не текущее состояние и не утверждённое требование. Предложенное уточнение FR-07 со статусом PENDING описано в [`../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md`](../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md). Общая `tests/conftest.py` всё ещё создаёт свою session-scoped seed-БД, но проверки расписания используют отдельную in-memory SQLite-БД на каждый test case; seed не вызывает расписание-сервисы или router endpoints.
 
 ## Среда
@@ -12,23 +12,23 @@
 
 ## Команда и результаты
 
-Параметры `--cov=app.services --cov=app.web.router --cov-branch` ограничивают сбор этими двумя модулями и включают branch arcs. Локальный отчёт и JSON лежат в scratch, не в Git:
+Параметры `--cov=app.services --cov=app.web.router --cov-branch` ограничивают сбор этими двумя модулями и включают branch arcs. XML/JSON в команде создаются относительно корня репозитория; `.coverage` — локальный файл данных pytest-cov:
 
 ```text
-COVERAGE_FILE='C:/Users/gdddg/AppData/Local/hermes/cache/scratch/.coverage-schedule-ci-final' ./.venv/Scripts/python.exe -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:C:/Users/gdddg/AppData/Local/hermes/cache/scratch/coverage-artem.xml --cov-report=json:C:/Users/gdddg/AppData/Local/hermes/cache/scratch/coverage-artem.json
-31 passed, 0 failed, 0 skipped, 1 warning (5.12s)
+python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:coverage-artem.xml --cov-report=json:coverage-artem.json
+36 passed, 0 failed, 0 skipped, 1 warning (3.94s)
 
-./.venv/Scripts/python.exe -m pytest -q
-217 passed, 0 failed, 0 skipped, 1 warning (12.93s)
+python -m pytest -q
+222 passed, 0 failed, 0 skipped, 1 warning (10.67s)
 ```
 
-Предупреждение обоих запусков: Starlette сообщает о deprecated-использовании `httpx` с `starlette.testclient`; тесты завершились успешно. Замеры coverage по двум источникам (вывод `pytest-cov`; колонка Cover объединяет statements и ветвления):
+Предупреждение обоих запусков: `StarletteDeprecationWarning` о deprecated-использовании `httpx` с `starlette.testclient`; все тесты завершились успешно. Замеры coverage по двум источникам (вывод `pytest-cov`; колонка Cover объединяет statements и ветвления):
 
 | Область отчёта | Statements покрыто | Branch arcs покрыто | Cover из отчёта |
 |---|---:|---:|---:|
-| `app/services.py` целиком | 109/167 (65.3%) | 22/44 (50.0%) | 62% |
+| `app/services.py` целиком | 115/173 (66.5%) | 26/48 (54.2%) | 64% |
 | `app/web/router.py` целиком | 230/527 (43.6%) | 22/134 (16.4%) | 38% |
-| Оба файла целиком | 339/694 (48.8%) | 44/178 (24.7%) | 44% |
+| Оба файла целиком | 345/700 (49.3%) | 48/182 (26.4%) | 45% |
 
 **Эти проценты не являются покрытием только расписания:** файлы содержат student, homework, material, review и другие endpoints. Более того, отчёт собран одним сфокусированным запуском, но модульные итоги суммируют непроверенные несмежные функции из тех же файлов.
 
@@ -40,7 +40,7 @@ COVERAGE_FILE='C:/Users/gdddg/AppData/Local/hermes/cache/scratch/.coverage-sched
 |---|---:|---:|---:|
 | `local_datetime`, `localize`, `student_dict`, `lesson_dict`, `scoped_student`, `scoped_lesson` (`app/services.py`) | 37–45, 57–75, 122–144, 181–197 | 100% в каждом участке | 100% по ветвям `localize`; в остальных диапазонах ветвей нет |
 | Calendar events для занятий (`app/services.py::calendar_events`) | 264–286 | 11/11 | 6/6 |
-| Создание занятия (`app/services.py::create_entity`, только `kind == "lesson"`, без диспетчеризации других типов) | 302–321 | 20/20 | 8/8 |
+| Создание занятия (`app/services.py::create_entity`, только `kind == "lesson"`) | 301–327 | 27/27 | 14/14 |
 | Страница расписания (`app/web/router.py::schedule`) | 91–93 | 3/3 | Условных ветвей нет |
 | Валидация payload для совместимого маршрута (`app/web/router.py::payload_dict`) | 60–63 | 4/4 | 2/2 |
 | API расписания (`app/web/router.py`: create compatible, reschedule, update, delete, list, get, create) | 215–249, 252–292, 359–381 | 100% в каждом участке | 100% по всем условным веткам в этих участках |
@@ -56,20 +56,20 @@ COVERAGE_FILE='C:/Users/gdddg/AppData/Local/hermes/cache/scratch/.coverage-sched
 - По API расписания первоначально оставался guard для JSON не-объекта в `payload_dict` (`app/web/router.py:61–62`); добавлен вариант A-SCH-18. Теперь страница `/schedule` (91–93), payload guard и выбранные lesson API участки имеют 100% строк и всех conditional branch arcs в измеренных диапазонах.
 - В `app/web/router.py` ещё пропущены ветви других teacher/student/homework endpoints; в целом модуль имеет 112 непокрытых branch arcs, но 0 partially covered branch points. Это не расписание-специфичные проверки и новые тесты за пределами FR-07 не добавлялись.
 - Правило, блокируют ли занятое время занятия со статусом `cancelled`, и политика касания `end == next.start` не определены FR-07. A-SCH-09/A-SCH-12 остаются на согласование; тесты не закрепляют ни текущую реализацию, ни рекомендованный вариант.
-- Schedule error paths проверены: чужой/архивный ученик, пустая тема, неизвестный статус при создании/обновлении, отсутствие поля переноса, отсутствующий ID, удаление, не-объектный payload и rollback при DB CHECK error. A-SCH-14…20 описаны в `TEST_CASES_ARTEM.md`.
+- Schedule error paths проверены: чужой/архивный ученик, пустая тема через совместимый и прямой POST, неизвестный статус при создании/обновлении, отсутствие поля переноса, отсутствующий ID, удаление, не-объектный payload и rollback при DB CHECK error; прямое создание также покрывает заметки длиной 0/500/501 и отсутствие записи при отказе. A-SCH-14…20 и A-SCH-25/26 описаны в `TEST_CASES_ARTEM.md`.
 
 ### Базовый замер до дополнительных coverage-кейсов
 
-На исходных 20 тестовых вариантах первый branch-coverage запуск дал: `app/services.py` — 41% Cover (167 statements, 92 missed, 44 branch arcs, 3 partial); `app/web/router.py` — 33% (527, 323, 134, 5 partial); суммарно — 35% (694, 415, 178, 8 partial). После A-SCH-14…20 и расширения набора актуальные whole-file Cover: 62%, 38% и 44% (рост на 21, 5 и 9 п.п.). `BrPart` router снизился 5→0, services изменился 3→6. Финальный GET `/schedule` дополнительно заходит в общий teacher-shell `activity_feed` и review-calendar loop; их пустые/неподготовленные данные теперь видны как частично покрытые ветви, перечисленные выше. Baseline-отчёт сохранил totals, но не отдельные branch arcs, поэтому сравнение partial-branch origins ограничено.
+Историческое сравнение: самый ранний branch-coverage запуск на 20 вариантах дал `app/services.py` — 41% Cover (167 statements, 92 missed, 44 branch arcs, 3 partial); `app/web/router.py` — 33% (527, 323, 134, 5 partial); суммарно — 35% (694, 415, 178, 8 partial). После A-SCH-14…20, на предыдущем наборе из 31 проверки, показатели whole-file Cover составляли 62%, 38% и 44%; текущий повторный замер на 36 вариантах приведён выше. В историческом отчёте `BrPart` router снизился 5→0, services изменился 3→6. Baseline-отчёт сохранил totals, но не отдельные branch arcs, поэтому сравнение partial-branch origins ограничено. Финальный GET `/schedule` дополнительно заходит в общий teacher-shell `activity_feed` и review-calendar loop; их пустые/неподготовленные данные теперь видны как частично покрытые ветви, перечисленные выше.
 
 ## CI
 
-`quality-gate.yml` сохраняет существующие compileall, полный `pytest`, JavaScript и PostgreSQL/Alembic проверки. Полный `pytest -q` автоматически собирает индивидуальный файл через текущий `testpaths=["tests"]`. После него добавлен отдельный coverage-запуск только `tests/test_schedule_pz02.py` с branch coverage и отчётами XML/JSON; обычный ненулевой exit code теста делает job failed, порог coverage не установлен. Шаг upload-artifact с `if: always()` сохраняет `coverage-artem.xml` и `coverage-artem.json` под именем `coverage-artem` (если файлы не созданы — warning).
+`quality-gate.yml` сохраняет compileall, полный `pytest`, JavaScript и PostgreSQL/Alembic-проверки. Теперь последовательность job: полный Python-набор → JavaScript → PostgreSQL/Alembic → focused coverage → загрузка артефакта. Coverage выполняется только после остальных проверок; его ненулевой exit code завершает job ошибкой. Шаг upload-artifact с `if: always()` следует за coverage и сохраняет XML/JSON под именем `coverage-artem` (если файлы не созданы — warning). Порог покрытия не установлен; проверки не отключались и не ослаблялись.
 
-Локально подтверждены разбор `pyproject.toml` через `tomllib`, разбор workflow через PyYAML и наличие обоих pytest-шагов и upload шага. `pip check` чист; финальный `pip install --dry-run -e '.[dev]'` с build isolation завершился успешно: editable-пакет и зависимости разрешены без установки. Ранее пробный dry-run с `--no-build-isolation` завершился `Cannot import 'setuptools.build_meta'` (setuptools отсутствовал в активной venv); стандартный build isolation устранил ограничение. `actionlint` в окружении отсутствует, поэтому семантическая lint-проверка workflow локально недоступна. При финальном аудите Actions обновлены до Node 24-совместимых major versions; команды JS-тестов и миграций сохранены.
+Локально подтверждены разбор `pyproject.toml` через `tomllib`, разбор workflow через PyYAML, порядок обязательных шагов и политика сохранения артефакта при ошибке. `pip check` чист; финальный `pip install --dry-run -e '.[dev]'` с build isolation завершился успешно: editable-пакет и зависимости разрешены без установки. Ранее пробный dry-run с `--no-build-isolation` завершился `Cannot import 'setuptools.build_meta'` (setuptools отсутствовал в активной venv); стандартный build isolation устранил ограничение. `actionlint` в окружении отсутствует, поэтому семантическая lint-проверка workflow локально недоступна. При финальном аудите Actions обновлены до Node 24-совместимых major versions; команды JS-тестов и миграций сохранены.
 
-Для опубликованного коммита `54bf940b9e428fb4eae92a4488059542451055eb` GitHub Actions run [#38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377) завершился со статусом `Success`; job `verify` также завершился `Success`. Создан артефакт `coverage-artem`, содержащий `coverage-artem.xml` и `coverage-artem.json`. Это результат именно указанного SHA; локальные замеры выше остаются отдельными локальными запусками.
+Для опубликованного коммита `54bf940b9e428fb4eae92a4488059542451055eb` GitHub Actions run [#38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377) завершился со статусом `Success`; job `verify` также завершился `Success`. Создан артефакт `coverage-artem`, содержащий `coverage-artem.xml` и `coverage-artem.json`. Для последующего документационного коммита `b565cae71c72680495849a072376f522a1f9e653` run [#38269437931](https://github.com/esnstwa/TutorFlow/actions/runs/38269437931) также завершился успешно. Каждый результат относится только к указанному SHA; локальные замеры выше остаются отдельными локальными запусками.
 
-В финальном аудите отдельно повторены индивидуальный набор (31 PASS), полный pytest (217 PASS), JS-наборы (34 + 6 PASS); сами coverage-цифры выше относятся к предыдущему зафиксированному instrumented запуску, а не пересчитаны в этих повторных прогонах.
+В предыдущем аудите отдельно повторялись индивидуальный набор (31 PASS), полный pytest (217 PASS), JS-наборы (34 + 6 PASS); эти исторические результаты предшествуют A-SCH-25/26. Coverage-цифры выше пересчитаны уже на 36 вариантах; старые итоги не выдаются за текущий замер.
 
 Coverage XML/JSON отчёты хранятся как CI artifact, а не коммитятся в репозиторий. Порог намеренно не задан. Мутационный эксперимент выполнен после этого этапа; фактические результаты и patch приведены в [MUTATION_ARTEM.md](MUTATION_ARTEM.md). Последующий риск-ориентированный пересмотр и оставшиеся интеграционные ограничения приведены в [RISK_REGISTER_ARTEM.md](RISK_REGISTER_ARTEM.md).
