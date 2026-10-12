@@ -227,4 +227,4 @@ python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web
 36 passed, 1 warning
 ```
 
-Оба новых Python-прогона и coverage-запуск завершились с exit code 0; предупреждение — одно `StarletteDeprecationWarning` о связке `httpx`/`starlette.testclient`. Текущие показатели и ограничения — в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Результаты здесь локальные; GitHub Actions для нового SHA ожидает запуска после push.
+Оба новых Python-прогона и coverage-запуск завершились с exit code 0; предупреждение — одно `StarletteDeprecationWarning` о связке `httpx`/`starlette.testclient`. Текущие показатели и ограничения — в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Для коммита исправлений `8c60b666848cf5cd723796de707f4ddf1d9d6bb3` GitHub Actions run [#38282040226](https://github.com/esnstwa/TutorFlow/actions/runs/38282040226) завершился успешно; job `verify` — `Success`. Артефакт `coverage-artem` содержит проверенные `coverage-artem.xml` и `coverage-artem.json`.

@@ -129,7 +129,7 @@ node tests/test_session_fetch.cjs
 - **R-SCH-07:** A-SCH-09/12 не реализованы и не имеют статуса PASS/FAIL; существующие тесты не снижают риск расхождения продуктовой политики.
 - **R-SCH-08:** прямой расписательной проверки реальной cookie/CSRF/role нет; нужен A-SCH-21. Отдельные auth-тесты не заменяют интеграцию с расписательным маршрутом.
 
-Локальная проверка после исправлений по ревью (2026-10-12): индивидуальный pytest — 36 PASS, полный Python pytest — 222 PASS; оба прогона с одним `StarletteDeprecationWarning`. JavaScript — 34 PASS; session-fetch — 6 PASS. Фокусный замер покрытия ветвей для 36 вариантов завершился успешно: показатель Cover для целых файлов `app/services.py` — 64%, `app/web/router.py` — 38%, оба файла — 45%; детали и ограничения приведены в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Предыдущий опубликованный SHA `b565cae71c72680495849a072376f522a1f9e653` имел успешный run #38269437931; этот результат относится только к прежнему SHA.
+Локальная проверка после исправлений по ревью (2026-10-12): индивидуальный pytest — 36 PASS, полный Python pytest — 222 PASS; оба прогона с одним `StarletteDeprecationWarning`. JavaScript — 34 PASS; session-fetch — 6 PASS. Фокусный замер покрытия ветвей для 36 вариантов завершился успешно: показатель Cover для целых файлов `app/services.py` — 64%, `app/web/router.py` — 38%, оба файла — 45%; детали и ограничения приведены в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Для review-коммита `8c60b666848cf5cd723796de707f4ddf1d9d6bb3` Actions run [#38282040226](https://github.com/esnstwa/TutorFlow/actions/runs/38282040226) завершился успешно (`verify` — `Success`).
 
 ### Для реальной интеграционной среды
 
