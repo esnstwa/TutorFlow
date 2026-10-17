@@ -11,24 +11,44 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-_SHA_PATTERN = re.compile(r"[0-9a-f]{7,40}\Z", re.IGNORECASE)
+_SHA_PATTERN = re.compile(r"[0-9a-f]{12,40}\Z", re.IGNORECASE)
 
 
-def _expected_sha(argument: str | None) -> str:
-    candidate = argument or os.getenv("TUTORFLOW_EXPECTED_SHA") or os.getenv("GITHUB_SHA")
+def _clean_git_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    for name in tuple(environment):
+        if name.upper().startswith("GIT_") or name.upper() in {
+            "GITHUB_SHA",
+            "TUTORFLOW_GIT_SHA",
+            "TUTORFLOW_EXPECTED_SHA",
+        }:
+            environment.pop(name)
+    return environment
+
+
+def _checkout_sha() -> str:
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        env=_clean_git_environment(),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=3,
+    ).stdout.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("git rev-parse не вернул полный SHA коммита")
+    return commit
+
+
+def _expected_sha(argument: str | None) -> str | None:
+    candidate = argument or os.getenv("TUTORFLOW_EXPECTED_SHA")
     if not candidate:
-        candidate = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=3,
-        ).stdout.strip()
+        return None
     candidate = candidate.strip().lower()
     if not _SHA_PATTERN.fullmatch(candidate):
-        raise ValueError("ожидался Git SHA длиной от 7 до 40 шестнадцатеричных символов")
-    return candidate[:12]
+        raise ValueError("ожидался Git SHA длиной от 12 до 40 шестнадцатеричных символов")
+    return candidate
 
 
 def _run_component(environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
@@ -49,15 +69,24 @@ def main() -> int:
     arguments = parser.parse_args()
 
     try:
+        checkout_sha = _checkout_sha()
         expected_sha = _expected_sha(arguments.expected_sha)
     except (OSError, subprocess.SubprocessError, ValueError) as error:
         print(f"component_check ERROR: {error}", file=sys.stderr)
         return 2
 
-    environment = os.environ.copy()
+    if expected_sha and not checkout_sha.startswith(expected_sha):
+        print(
+            f"component_check ERROR: SHA не совпал; ожидался {expected_sha[:12]}, "
+            f"получен {checkout_sha[:12]}",
+            file=sys.stderr,
+        )
+        return 1
+    expected_sha = checkout_sha[:12]
+
+    environment = _clean_git_environment()
     environment["APP_NAME"] = "TutorFlow-Quality-Check"
     environment["APP_ENV"] = "test"
-    environment.pop("TUTORFLOW_GIT_SHA", None)
 
     result = _run_component(environment)
     if result.returncode != 0:

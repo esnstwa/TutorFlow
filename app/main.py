@@ -50,4 +50,4 @@ app.include_router(web_router)
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 def health() -> dict[str, str]:
-    return {"status": "ok", **runtime_info(settings.app_name, settings.app_env)}
+    return {"status": "ok"}

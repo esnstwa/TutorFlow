@@ -1,119 +1,93 @@
 # Фактические доказательства и карта рисунков
 
-Дата локальной проверки: **17.10.2026**. Это рабочий протокол по текущему дереву, а не готовый протокол независимого студента и не ссылка на GitHub Actions.
+Локальные проверки выполнены **17 октября 2026 года** на рабочем дереве изменений для PR #9. Это авторская проверка, не протокол независимого студента. Значение SHA из локального предкоммитного запуска не переносится сюда как идентификатор PR: для PR используйте текущий `headRefOid` и связанный с ним GitHub Actions run.
 
-## Среда и состояние репозитория
+## Среда и состояние
 
-- Ветка: `feature/mdk0104-pz01-instrumental-contour`.
-- Последний `git fetch origin main`: локальный `HEAD` и `origin/main` совпали на `8592ed601fae`.
-- Рабочее дерево намеренно не чистое: в нём текущие незакоммиченные изменения; отдельный ранее существовавший `start_tutorflow.bat` оставлен нетронутым. Код не зафиксирован; текущая диагностическая версия показывает `8592ed601fae-dirty`.
-- Локальная среда: Python **3.14.7**, `uv` **0.11.21**, Node **v26.7.0**, pytest **8.4.2**. В проекте `requires-python >=3.12`; Docker и CI выбирают ветку Python 3.12. Проверка на конкретном patch-релизе Python 3.12.x в этой сессии не выполнена. В checkout уже есть игнорируемая `.venv`, у которой `uv` сообщил ссылку на отсутствующий интерпретатор; её не удаляли и не пересоздавали, проектные установки выполнялись во внешнем scratch-окружении.
-- Свежая изолированная dev-среда создана командой `uv sync --locked --extra dev` через внешний `UV_PROJECT_ENVIRONMENT`: `Resolved 47 packages`, `Installed 46 packages`; полный набор прошёл в ней.
-- Сборочный backend закреплён как `setuptools==84.0.0`; `uv.lock` фиксирует 47 разрешённых пакетов. `uv lock --check` завершился кодом 0 с предупреждением об игнорировании устаревшей локальной `.venv`.
-- Wheel — `tutorflow-0.1.0-py3-none-any.whl`. Артефакт проверен вне checkout по адресу `C:\Users\artem\AppData\Local\hermes\cache\scratch\tutorflow-pz01-delivery-v1\tutorflow-0.1.0-py3-none-any.whl`.
+- Ветка: `feature/0104-pz01-artem`; целевой PR: [#9](https://github.com/esnstwa/TutorFlow/pull/9).
+- Локально: CPython **3.14.7**, `uv` **0.11.21**, Node **v26.7.0**. Workflow использует Python 3.12 и Node 24; локальный результат не подменяет проверку CI на целевых версиях.
+- Dev-зависимости сверены/установлены командой `uv sync --locked --extra dev` во внешнее окружение; команда завершилась успешно. `uv lock --check` завершился с кодом 0 и сообщил, что существующая локальная `.venv` связана с отсутствующим интерпретатором и игнорируется. `.venv` не удаляли и не пересоздавали.
+- В рабочем дереве был посторонний неотслеживаемый `start_tutorflow.bat`; он не относится к этой работе и не включён в staging/изменения.
 
-## Выполненные команды и результаты
+## Критерии и фактические результаты
 
-### Р3 — запуск, конфигурация и диагностика
+| Критерий | Статус | Команда/артефакт и фактическое подтверждение |
+|---|---|---|
+| Р1 — ADR и 7 инструментов | Готово | `ADR-001.md` обосновывает используемый стек и альтернативы; `TOOLCHAIN.md` содержит ровно семь позиций: подготовка, зависимости, тестирование, статический анализ, динамическая диагностика, профилирование, автоматические проверки. |
+| Р2 — собственная часть каркаса | Готово локально | `scripts/build_component.py wheel` проверяет пять обязательных файлов, включая `schedule.html` и `schedule.css`; staging берёт только tracked-файлы `app/`, отклоняет symlink и источники за пределами репозитория. `pyproject.toml` также проверяется на symlink/path escape. `tests/test_build_component.py` проверяет исключение untracked-файлов, symlink/path escape и отказ при небезопасном `pyproject.toml`. |
+| Р3 — конфигурация, версия/SHA, диагностика | Готово локально | `pytest` покрывает штатную/ошибочную конфигурации, отсутствие утечки контрольного значения из `DATABASE_URL`, границы SHA, выбор источника revision (source Git против packaged metadata), включая устаревший build-info в checkout и некорректный UTF-8, и фильтрацию подменяющих env vars. Невалидная конфигурация возвращает код 2. |
+| Р4 — путь исполнения | Готово локально | RUNBOOK описывает путь `uv.lock → setuptools/wheel → CPython → Uvicorn/ASGI → FastAPI → HTTP`. `compileall`, `dis`, `pdb` и `cProfile` выполнены; `cProfile` зарегистрировал 225 543 вызова/2 244 функции для диагностического CLI (не benchmark сервиса). |
+| Р5 — два режима | Готово для заявленного smoke-сценария | Source checkout через отдельный Uvicorn: `/health` 200 с `{"status":"ok"}`, CSS 200 / 23 199 байт. Установленный wheel: импорт из временного `site-packages` внутри постороннего Git-репозитория, отдельный Uvicorn и те же HTTP-ответы. Wheel revision совпал с `build-info.json` и отличался от SHA постороннего репозитория. |
+| Р6 — независимое воспроизведение | Не выполнено | Другой студент ещё не проводил чистую проверку; `REPRODUCTION_PROTOCOL_TEMPLATE.md` остаётся пустым шаблоном. |
+| Р7 — содержательная CI-проверка | Код и локальная отрицательная проверка готовы; удалённый статус проверяется по HEAD PR | `check_component.py` получает независимый HEAD через `git rev-parse HEAD`; при ложном `TUTORFLOW_EXPECTED_SHA`/`GITHUB_SHA` возвращает ошибку. Команда с `--expected-sha 000000000000` действительно завершилась кодом 1 и сообщением о несовпадении SHA. Новый GitHub Actions run должен быть проверен именно на `headRefOid` PR #9. |
 
-Штатный CLI:
+## Команды и результаты
 
 ```text
-APP_NAME=TutorFlow-PZ01 APP_ENV=test python -m app.core.runtime_diagnostics
-INFO component_start
-INFO component_result status=ok version=0.1.0 git_sha=8592ed601fae-dirty
-{"app_name": "TutorFlow-PZ01", "environment": "test", "git_sha": "8592ed601fae-dirty", "status": "ok", "version": "0.1.0"}
+python -m pytest -q
+284 passed, 1 warning (StarletteDeprecationWarning от TestClient/httpx)
+
+node --test tests/auth-wizard.test.cjs tests/student-lifecycle.test.cjs
+34 passed, 0 failed
+node tests/test_session_fetch.cjs
+6 checks passed
+
+python -m compileall -q app scripts tests
 exit code: 0
+uv sync --locked --extra dev
+exit code: 0
+uv lock --check
+exit code: 0 (uv игнорирует существующую .venv, привязанную к отсутствующему интерпретатору)
+docker compose config --quiet
+exit code: 0
+docker info
+не выполнено: Docker daemon недоступен
 ```
 
-Ошибочная конфигурация:
+HTTP-проверка исходного режима:
 
 ```text
-APP_ENV=invalid-pz01-value python -m app.core.runtime_diagnostics
-INFO component_start
-configuration_error: app_env: Input should be 'production', 'development', 'local' or 'test'
-INFO component_result status=error
-exit code: 2
+SOURCE_SERVER PASS health=200 health_json={'status': 'ok'} static=200 css_bytes=23199
 ```
 
-Последовательность восстановления также проверена в одном процессе оболочки: корректная конфигурация → `APP_ENV=invalid-pz01-value` → повторная корректная конфигурация; коды возврата `0 → 2 → 0`.
-
-Тесты дополнительно проверяют, что безопасная диагностика не выводит контрольную строку, помещённую в `DATABASE_URL`; реальное значение подключения в доказательства не включено.
-
-`python scripts/check_component.py` завершился сообщением `component_check PASS version=0.1.0 git_sha=8592ed601fae-dirty valid_config=0 invalid_config=2`. Это проверяет обе ветви конфигурации и ожидаемый SHA.
-
-### Р4–Р5 — результат и один сценарий в двух режимах
-
-Финальная сборка прошла командой:
+Сборка и запуск установленного wheel вне checkout:
 
 ```text
-python scripts/build_component.py wheel --out-dir <вне checkout> --work-dir <вне checkout>
-BUILD_OK artifact=...\tutorflow-0.1.0-py3-none-any.whl version=0.1.0 git_sha=8592ed601fae-dirty packaged_files=5
+BUILD_OK version=0.1.0 packaged_files=5
+WHEEL_RUNTIME PASS foreign_git_sha отличается; health=200 static=200 css_bytes=23199 import=installed-wheel
+WHEEL_CONTENT PASS files=107; top-level tests/, migrations/, docs/ и scripts/ отсутствуют
 ```
 
-Проверяющий сборщик подтвердил пять обязательных файлов: `app/main.py`, `app/core/runtime_diagnostics.py`, `app/build-info.json`, шаблон расписания и `schedule.css`. В полном wheel — 107 файлов. Отдельная проверка архива показала `required_present=5 required_total=5`.
+Сборка выполнила staging только отслеживаемых файлов `app/` и `pyproject.toml`, затем добавила `app/build-info.json`. В wheel не попали корневые миграции, тесты, документация или посторонние локальные файлы. Сценарий не требует БД, поэтому миграции для этого минимального компонента не добавлялись. Docker Compose-конфигурация разобрана, но Docker image build/run здесь не заявляется как выполненный.
 
-Изолированное runtime-окружение создано по `uv.lock` вне репозитория; wheel установлен без повторного разрешения зависимостей. Для одного и того же `APP_NAME=TutorFlow-PZ01`, `APP_ENV=test` дважды выполнен сценарий `GET /health` + `GET /static/css/schedule.css`:
-
-```text
-mode=source app_import=<checkout>\app\__init__.py
-launch=1 health=200 static=200 css_bytes=23199 version=0.1.0 git_sha=8592ed601fae-dirty app_env=test
-launch=2 health=200 static=200 css_bytes=23199 version=0.1.0 git_sha=8592ed601fae-dirty app_env=test
-
-mode=wheel app_import=<внешний runtime-env>\Lib\site-packages\app\__init__.py
-launch=1 health=200 static=200 css_bytes=23199 version=0.1.0 git_sha=8592ed601fae-dirty app_env=test
-launch=2 health=200 static=200 css_bytes=23199 version=0.1.0 git_sha=8592ed601fae-dirty app_env=test
-```
-
-В обоих режимах Uvicorn напечатал `application_start` и `application_stop`. Wheel импортировался из внешнего `site-packages`, запросы проходили при текущем каталоге вне исходников и без IDE. Это проверка упаковки и запуска, не замер производительности. Нативных Debug/Release-оптимизаций Python-пакету не приписываем.
-
-Внешнее runtime-окружение разрешило по lock девять прямых runtime-зависимостей: `alembic 1.20.0`, `argon2-cffi 25.1.0`, `email-validator 2.3.0`, `fastapi 0.143.2`, `jinja2 3.1.6`, `psycopg 3.3.6`, `pydantic-settings 2.16.0`, `sqlalchemy 2.1.4`, `uvicorn 0.54.0`.
-
-Состав Python подтверждён командами `python -m dis app/core/runtime_diagnostics.py` и `uv pip tree --package tutorflow --depth 1 --python <внешний-python.exe>`. Вывод `dis` сохранён в `C:\Users\artem\AppData\Local\hermes\cache\scratch\tutorflow-diagnostics-dis-final.txt`. `cProfile` обработал CLI: 220 960 вызовов и 2 196 функций; файл профиля — `C:\Users\artem\AppData\Local\hermes\cache\scratch\tutorflow-runtime-final.pstats`. Это демонстрация инструментария, не benchmark веб-сервиса. Запуск через `pdb -c continue` завершился кодом 0 и вывел тот же JSON.
-
-### Р7 — проверка с намеренным нарушением
+Отрицательная проверка SHA:
 
 ```text
 python scripts/check_component.py --expected-sha 000000000000
-component_check ERROR: SHA не совпал; ожидался 000000000000, получен 8592ed601fae
+component_check ERROR: SHA не совпал
 exit code: 1
 ```
 
-Отрицательная проверка завершилась именно ожидаемой ошибкой. Исходные файлы не подменялись ради отрицательного запуска; нарушено только входное условие `--expected-sha`.
+Положительный запуск прошёл и сообщил `component_check PASS`; проверка с нулевыми `TUTORFLOW_GIT_SHA`/`GITHUB_SHA` не подменила результат. До нового push завершённый Actions run относится только к SHA, на котором он реально запускался, и не подтверждает следующий HEAD.
 
-### Общие проверки
+## Карта семи обязательных снимков
 
-- `uv lock --check` — код 0.
-- `python -m compileall -q app` — код 0.
-- Полный `pytest -q` — **258 passed**, один предупреждающий `StarletteDeprecationWarning` о `httpx`/`starlette.testclient`; падений нет.
-- Node: **34 теста passed**, `tests/test_session_fetch.cjs` — **6 checks passed**.
-- YAML workflow разобран парсером; Docker Compose конфигурация проходит `docker compose config --quiet`.
-- `scripts/build_component.py image --dry-run` показал план `docker compose build web` и текущий SHA.
-- Фактическая Docker-сборка/запуск невозможны в текущем сеансе: `docker info` вернул код 1, Docker API не найден (`dockerDesktopLinuxEngine`). Docker-образ не объявляется проверенным.
-- GitHub Actions для этой незакоммиченной и незапушенной ветки не запускался. Публиковать workflow ради запуска запрещено текущим заданием.
+**В каталоге материалов нет фактических изображений. Все семь снимков ещё предстоит сделать и приложить к индивидуальному отчёту.** Указания ниже не являются изображениями или доказательством уже выполненного шага.
 
-## Карта обязательных снимков экрана 1–7
-
-**Фактических изображений здесь пока нет.** Таблица указывает, что именно нужно захватить настоящим редактором/терминалом; не заменять эти снимки макетом, текстом из этого файла или изображением-заглушкой.
-
-| Рисунок | Что должно попасть в кадр и откуда взять | Статус |
+| Рисунок | Что захватить из фактического инструмента | Статус |
 |---:|---|---|
-| 1 | В редакторе показать самостоятельный участок расписания: `pyproject.toml` (пакетные ресурсы) и `scripts/build_component.py` (проверка `schedule.html`/`schedule.css`); при необходимости рядом `app/core/runtime_diagnostics.py`. Подпись — «Поставка ресурсов расписания и runtime-диагностика». | Код готов; настоящий снимок редактора сделать вручную. |
-| 2 | Терминал с двумя режимами: сначала внешний путь `UV_PROJECT_ENVIRONMENT=<вне checkout>` и `uv sync --locked --extra dev`, затем `python scripts/build_component.py wheel --out-dir ... --work-dir ...`, с выводом `BUILD_OK`. Не писать про `-O`/native Release: таких настроек у этого Python-wheel нет. | Обе команды и wheel фактически проверены; снимок терминала сделать вручную. |
-| 3 | Терминал из внешнего каталога: путь `app.__file__` внутри `runtime-env\Lib\site-packages`, запуск Uvicorn, успешные `health=200` и `static=200`. Команда сравнения — `python <scratch>\verify_tutorflow_modes.py compare ...`; либо повторить ручную команду из `RUNBOOK.md`. | Wheel фактически запущен вне checkout; снимок сделать вручную. |
-| 4 | Штатный запуск `python -m app.core.runtime_diagnostics`: команда, JSON с `version=0.1.0`, `git_sha=...-dirty`, `status=ok`, успешная диагностика и код 0. | Фактический вывод есть выше; снимок терминала сделать вручную. |
-| 5 | Та же команда с `APP_ENV=invalid-pz01-value`: `configuration_error`, отсутствие секретных значений и код 2. | Фактический вывод есть выше; снимок терминала сделать вручную. |
-| 6 | Чистое окружение другого студента, точный commit, установленные версии, команды, запуск и результат; заполнить [шаблон протокола](REPRODUCTION_PROTOCOL_TEMPLATE.md). | Не выполнялось. Нужен другой студент и проверяемая неизменяемая версия исходника. |
-| 7 | Терминал с `python scripts/check_component.py --expected-sha 000000000000`, понятным несовпадением и кодом 1. | Фактический отрицательный вывод есть выше; снимок терминала сделать вручную. |
+| 1 | Редактор: собственный участок расписания, правила package-data и проверка `schedule.html`/`schedule.css` сборщиком. | Отсутствует |
+| 2 | Терминал: подготовка locked-окружения и успешная сборка wheel (`BUILD_OK`) во внешний каталог. | Отсутствует |
+| 3 | Терминал из внешнего каталога/постороннего Git-репозитория: установленный wheel, путь импорта, Uvicorn, ответы `/health` и CSS. | Отсутствует |
+| 4 | Штатная конфигурация: диагностический JSON, version/SHA, код 0. Секретные значения не показывать. | Отсутствует |
+| 5 | Ошибочный `APP_ENV`: `configuration_error`, код 2 и отсутствие значений секретов в выводе. | Отсутствует |
+| 6 | Чистая среда независимого проверяющего, точная версия исходника, фактические команды и результат из заполненного протокола. Только после проверки другим студентом. | Отсутствует; Р6 не выполнено |
+| 7 | Отрицательный запуск `check_component.py --expected-sha 000000000000`, сообщение о несовпадении и код 1. | Отсутствует |
 
-## Что ещё нужно закрыть
+## Что необходимо до сдачи
 
-1. Сделать и вставить семь подлинных снимков в отчёт; рисунок 6 — только после проверки другим студентом.
-2. Провести независимое воспроизведение на чистом окружении и заполнить протокол. Текущий авторский запуск этим не считается.
-3. После разрешённой публикации PR/ветки дождаться GitHub Actions и добавить ссылку на фактический run. Сейчас коммит/PR/push/merge/tag не создавались по прямому ограничению задания.
-4. Если для сдачи требуют точного совпадения patch-версии Python, провести проверку на целевом Python 3.12.x; локальный фактический запуск выполнен на Python 3.14.7.
-5. Docker-образ проверить после запуска Docker Desktop; текущая проверка ограничена YAML/Compose-конфигурацией и dry-run.
-
-## Примечание о локальных build-артефактах
-
-Во время ранней базовой сборки `uv build`, выполненной до появления staging-сборщика, setuptools обновил игнорируемые генерируемые файлы каталога `build/`. Этот каталог существовал заранее и содержит пользовательские материалы; никакие файлы из него не удалялись намеренно, но прежнее содержимое генерируемых package-artifacts не восстанавливается из Git. Финальная подтверждённая сборка выполнялась безопасным staging-скриптом во внешнем scratch-каталоге. База данных/пользовательские файлы не заменялись намеренно.
+1. После публикации изменений дождаться GitHub Actions и сопоставить SHA завершённого run с текущим `headRefOid` PR #9; если после этого появится новый commit, проверить CI заново.
+2. Получить повторную проверку `iver-ks` и новое решение. Старый `CHANGES_REQUESTED` сам по себе не снят; автоматическая проверка не считается отзывом другого студента.
+3. Передать неизменяемый PR commit другому студенту для чистого воспроизведения, заполнить протокол реальными версиями/командами/результатами и сделать рисунок 6.
+4. Сделать и приложить подлинные скриншоты 1–5 и 7, затем включить ссылки/подписи в индивидуальный отчёт. Не отмечать снимки и Р6 выполненными до получения реальных материалов.
+5. Отдельный Docker build нужен только если методичка/сдача требует именно Docker-путь; он не выводится из успешного wheel smoke-теста.

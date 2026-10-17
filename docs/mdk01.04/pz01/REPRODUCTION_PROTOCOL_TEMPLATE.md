@@ -25,7 +25,7 @@
 | Проверка компонента | `uv run --locked --no-sync python scripts/check_component.py` |  |  |
 | Pytest | `uv run --locked --no-sync python -m pytest -q` |  |  |
 | Отрицательный тест SHA | `uv run --locked --no-sync python scripts/check_component.py --expected-sha 000000000000` | ожидается ненулевой код и сообщение о несовпадении SHA |  |
-| Wheel вне checkout | команды из `RUNBOOK.md`, команда `import app; print(app.__file__)` |  |  |
+| Wheel вне checkout и постороннего Git-репозитория | Команды сборки и `scripts/verify_wheel_runtime.py` из `RUNBOOK.md` | Указать фактические `WHEEL_RUNTIME PASS`, health/static status, импорт из wheel и exit code |  |
 | Повторный запуск | остановить и повторно запустить тот же сценарий |  |  |
 
 ## Сравнение режимов (тот же сценарий)

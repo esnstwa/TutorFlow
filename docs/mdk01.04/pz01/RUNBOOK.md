@@ -2,7 +2,7 @@
 
 ## Назначение компонента
 
-Проверяемый минимальный компонент — существующий HTTP-сервис TutorFlow и новый модуль `app.core.runtime_diagnostics`. Он сообщает имя приложения и окружение из настроек, версию пакета и Git SHA, пишет безопасные записи о начале/результате запуска и поддерживает `/health`. Модуль не подключается к БД и не печатает `DATABASE_URL`, пароли, токены или содержимое `.env`.
+Проверяемый минимальный компонент — запускаемый пакет приложения и smoke-сценарий `GET /health` плюс `GET /static/css/schedule.css`. Это не отдельный микросервис: wheel содержит отслеживаемые Python-модули `app/`, шаблоны/статику, metadata `build-info.json` и зависимости, необходимые приложению. Корневые миграции, тесты, документация и неотслеживаемые файлы в staging не копируются. Данный сценарий не подключается к БД, поэтому миграции для него не требуются.
 
 Самостоятельная часть для зоны расписания — обеспечить сохранение `app/web/templates/pages/schedule.html` и `app/web/static/css/schedule.css` при поставке wheel; `scripts/build_component.py` проверяет наличие обоих файлов в собранном пакете. Общая часть каркаса — безопасная runtime-диагностика и проверка конфигурации/SHA. Изменения не меняют бизнес-логику расписания, авторизацию или экраны.
 
@@ -10,19 +10,17 @@
 
 Создать `.env` из `.env.example` можно только если `.env` ещё нет. Пример уже содержит `APP_NAME=TutorFlow` и `APP_ENV=development`; не переносить реальные секреты в пример конфигурации.
 
-В чистом checkout:
+В чистом checkout (внешний путь окружения не затрагивает существующий `.venv`):
 
 ```powershell
-$env:UV_PROJECT_ENVIRONMENT = "C:\путь\вне\репозитория\tutorflow-dev"
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $env:TEMP "tutorflow-pz01-dev"
 uv sync --locked --extra dev
 uv run --locked --no-sync python -m app.core.runtime_diagnostics
-uv run --locked --no-sync python -m pytest tests/test_health.py tests/test_runtime_diagnostics.py -q
+uv run --locked --no-sync python -m pytest -q
 uv run --locked --no-sync python scripts/check_component.py
 ```
 
-Для этой рабочей копии используй внешний путь для окружения: `uv lock --check` обнаружил игнорируемый `.venv`, связанный с отсутствующим интерпретатором. Его не удалять и не пересоздавать; в чистом клоне этой локальной помехи может не быть.
-
-Ожидаемый успешный вывод диагностического CLI — JSON со `status=ok`, `app_name`, `environment`, `version` и `git_sha`, а также записи `component_start` и `component_result` в stderr. Для чистого состояния SHA — 12 шестнадцатеричных символов; если изменены файлы приложения, манифест, lock или скрипт сборки — к SHA добавляется `-dirty`. Значение `unknown` не считается доказательством идентификации исходника.
+Успешный CLI выводит JSON со `status=ok`, `app_name`, `environment`, `version` и `git_sha`, а также `component_start`/`component_result` в stderr. Source checkout берёт SHA через Git и отмечает затронутое незакоммиченное состояние суффиксом `-dirty`; короткие/невалидные SHA отклоняются. Wheel берёт revision из собственного `app/build-info.json` и не ищет Git-репозиторий вокруг `site-packages`. `unknown` не считается идентификацией исходника.
 
 `APP_NAME` влияет на заголовок приложения и диагностический JSON. `APP_ENV` валидируется как `production`, `development`, `local` или `test`; ошибочное значение останавливает запуск с кодом 2 и сообщением о поле, без печати входного значения:
 
@@ -40,7 +38,7 @@ $env:APP_ENV = "development"
 uv run --locked --no-sync python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Во втором терминале выполнить `Invoke-RestMethod http://127.0.0.1:8000/health`; ожидаются `status=ok`, версия и SHA. Остановить сервер `Ctrl+C`; повторить команду запуска и запрос. `/health` не проверяет доступность PostgreSQL — это прямо указано в README.
+Во втором терминале выполнить `Invoke-RestMethod http://127.0.0.1:8000/health` и запросить `http://127.0.0.1:8000/static/css/schedule.css`. `/health` сохраняет совместимый ответ только `{"status":"ok"}`; версия/SHA пишутся один раз в событиях запуска/остановки, не вычисляются на каждый health-запрос. Остановить сервер `Ctrl+C` и повторить запуск. `/health` не проверяет PostgreSQL.
 
 ## Режим разработки и поставочный режим
 
@@ -48,36 +46,30 @@ uv run --locked --no-sync python -m uvicorn app.main:app --reload --host 127.0.0
 
 | Параметр | Разработка | Поставка |
 |---|---|---|
-| Подготовка | `uv sync --locked --extra dev`; исходный checkout | `python scripts/build_component.py wheel --out-dir <вне checkout> --work-dir <вне checkout>`; установка wheel в отдельное окружение по lock-файлу |
-| Запуск | `uv run ... uvicorn app.main:app --reload` из каталога репозитория | `python -m uvicorn app.main:app` из каталога вне репозитория; код загружается из установленного wheel, без `--reload` и IDE |
+| Подготовка | `uv sync --locked --extra dev`; исходный checkout | Сборка wheel во внешние каталоги; verifier устанавливает wheel в отдельный target-каталог с locked runtime dependencies |
+| Запуск | Uvicorn из исходного checkout | Uvicorn запускается verifier из внешнего каталога внутри другого Git-репозитория; импорт должен идти из установленного wheel, без `--reload` и IDE |
 | Преобразование кода | CPython загружает `.py`-модули; байткод может кэшироваться по правилам Python | Тот же Python-код в wheel; в поставочном пакете также есть шаблоны, static-файлы и `build-info.json` |
 | Оптимизации | Нет отдельной native Debug-сборки | Нет отдельной native Release-сборки; не заявляется выигрыш в скорости |
-| Диагностика | stdout/stderr, журнал Uvicorn, `/health`, `pdb` | Тот же `/health` и JSON; версия и SHA читаются из установленного пакета |
-| Состав результата | Checkout, виртуальное окружение и исходные файлы | Wheel `tutorflow-*.whl` и отдельное виртуальное окружение с зависимостями из `uv.lock` |
+| Диагностика | CLI, журнал Uvicorn, совместимый `/health`, `pdb` | Те же HTTP-проверки; версия и SHA берутся из `build-info.json` wheel |
+| Состав результата | Checkout, виртуальное окружение и исходные файлы | Wheel `tutorflow-*.whl`, установленный в отдельный target-каталог; runtime-зависимости из dev-окружения, подготовленного по `uv.lock` |
 
-Собирать wheel следует через `scripts/build_component.py`, а не запускать setuptools-сборку в существующем каталоге `build/`: в этом локальном репозитории там уже лежат пользовательские файлы. Скрипт копирует только манифест и каталог приложения во временную staging-копию, добавляет SHA в пакет и отказывает при попытке записать wheel внутрь репозитория или поверх существующего wheel.
+Собирать wheel следует через `scripts/build_component.py`: staging получает только `pyproject.toml` и отслеживаемые Git файлы из `app/`, затем сборщик добавляет `app/build-info.json`. Путь вывода и временный каталог должны быть вне checkout; существующий wheel не перезаписывается.
 
-Пример PowerShell для проверки wheel вне исходников (подставить новый внешний каталог):
+Сборка и end-to-end проверка установленного wheel вне исходников:
 
 ```powershell
-$root = (Get-Location).Path
-$out = "C:\путь\вне\репозитория\tutorflow-wheel"
-$work = "C:\путь\вне\репозитория\tutorflow-temp"
+$stamp = Get-Date -Format yyyyMMddHHmmss
+$out = Join-Path $env:TEMP "tutorflow-wheel-$stamp"
+$work = Join-Path $env:TEMP "tutorflow-wheel-work-$stamp"
 New-Item -ItemType Directory -Force $work | Out-Null
-python scripts/build_component.py wheel --out-dir $out --work-dir $work
+uv run --locked --no-sync python scripts/build_component.py wheel --out-dir $out --work-dir $work
 $wheel = (Get-ChildItem $out -Filter "tutorflow-*.whl").FullName
-$runtime = Join-Path $out "runtime-env"
-$env:UV_PROJECT_ENVIRONMENT = $runtime
-uv sync --locked --no-dev --no-install-project
-uv pip install --python (Join-Path $runtime "Scripts\python.exe") --no-deps $wheel
-Set-Location $work
-$env:APP_NAME = "TutorFlow-PZ01"
-$env:APP_ENV = "test"
-& (Join-Path $runtime "Scripts\python.exe") -c "import app; print(app.__file__)"
-& (Join-Path $runtime "Scripts\python.exe") -m app.core.runtime_diagnostics
+$expected = (git rev-parse --short=12 HEAD).Trim()
+if (git status --porcelain --untracked-files=all -- app pyproject.toml uv.lock scripts/build_component.py) { $expected += "-dirty" }
+uv run --locked --no-sync python scripts/verify_wheel_runtime.py --wheel $wheel --expected-sha $expected
 ```
 
-В последней команде `app.__file__` должен указывать на `site-packages`, а текущий каталог — на внешний `$work`, не на checkout. Для одной и той же HTTP-проверки в этом окружении запустить `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000` без `--reload` и выполнить тот же `Invoke-RestMethod`. Для остановки использовать `Ctrl+C`; никаких файлов БД эта проверка не меняет.
+Verifier создаёт временный посторонний Git-репозиторий, устанавливает wheel туда, проверяет импорт из установленного каталога, запускает отдельный Uvicorn и выполняет настоящие HTTP-запросы `/health` и CSS. Временный репозиторий и процесс удаляются/останавливаются после проверки; база данных не используется.
 
 Docker-путь использует те же lock и версию сборщика:
 
@@ -91,7 +83,7 @@ docker compose exec -T web alembic upgrade head
 
 ## Путь исполнения Python/FastAPI
 
-`pyproject.toml` и `uv.lock` → `uv sync --locked` разрешает Python-интерпретатор и фиксированные зависимости → `setuptools` собирает wheel → CPython загружает Python-модули и формирует/использует bytecode → Uvicorn импортирует `app.main:app` как ASGI-приложение → FastAPI сопоставляет маршрут `/health` → `runtime_info` возвращает версию и SHA → HTTP-клиент получает JSON. В приложении нет собственной native-компиляции; стадий C/C++-компоновки здесь нет.
+`pyproject.toml` и `uv.lock` → `uv sync --locked` подготавливает интерпретатор и фиксированные зависимости → `setuptools` собирает wheel → CPython загружает Python-модули и формирует/использует bytecode → Uvicorn импортирует `app.main:app` как ASGI-приложение → FastAPI маршрутизирует `/health` к неизменному ответу `{"status":"ok"}`. При старте/остановке lifespan один раз записывает runtime-версию и SHA; отдельный запрос `/health` не вычисляет их и не вызывает Git. В приложении нет собственной native-компиляции; стадий C/C++-компоновки здесь нет.
 
 Команды для подтверждения состава пакета и кода:
 
