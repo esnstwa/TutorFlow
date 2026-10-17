@@ -2,6 +2,10 @@
 .gitignore
 .env
 .venv
+build/
+dist/
+var/uploads/
+*.db
 __pycache__/
 *.py[cod]
 .pytest_cache/
