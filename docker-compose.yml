@@ -1,6 +1,9 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      args:
+        TUTORFLOW_GIT_SHA: ${TUTORFLOW_GIT_SHA:-unknown}
     environment:
       APP_NAME: TutorFlow
       APP_ENV: ${APP_ENV:-development}

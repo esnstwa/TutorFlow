@@ -8,10 +8,11 @@ TutorFlow — веб-платформа для взаимодействия ча
 
 ## Локальный запуск
 
-Создайте `.env` из `.env.example`, только если своего `.env` ещё нет. Для локального HTTP используется `APP_ENV=development`; Compose передаёт его явно и по умолчанию публикует сайт только на `127.0.0.1:8000`.
+Создайте `.env` из `.env.example`, только если своего `.env` ещё нет. Для локального HTTP используется `APP_ENV=development`; Compose по умолчанию публикует сайт только на `127.0.0.1:8000`. Сборка образа передаёт в него SHA исходного состояния; суффикс `-dirty` означает незакоммиченные изменения затронутых файлов.
 
 ```bash
-docker compose up -d --build
+python scripts/build_component.py image
+docker compose up -d
 docker compose exec -T web alembic upgrade head
 ```
 
@@ -50,7 +51,9 @@ docker compose exec -T web python -m app.seed
 ## Проверки
 
 ```bash
-.venv/Scripts/python.exe -m pytest -q
+uv sync --locked --extra dev
+uv run --locked --no-sync python -m pytest -q
+uv run --locked --no-sync python scripts/check_component.py
 node --test tests/auth-wizard.test.cjs tests/student-lifecycle.test.cjs
 node tests/test_session_fetch.cjs
 docker compose exec -T web alembic current
@@ -62,3 +65,7 @@ Pytest использует отдельную SQLite-БД и не заменя�
 ## Учебная документация / МДК.03.02
 
 Материалы ПЗ №1 «Формирование требований и регламента инженерного процесса проекта» собраны в [docs/mdk03.02/pz01/](docs/mdk03.02/pz01/README.md). Документы отделяют подтверждённые кодом факты от предположений и внешних TODO (интервью, независимое оппонирование и данные индивидуального отчёта).
+
+## Практическая работа / МДК.01.04
+
+Материалы ПЗ №1 «Инструментальный контур и воспроизводимое исполнение минимального программного компонента» находятся в [docs/mdk01.04/pz01/](docs/mdk01.04/pz01/README.md).
