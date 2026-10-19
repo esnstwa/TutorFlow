@@ -1,6 +1,6 @@
 # Реестр рисков — расписание Артёма (ПЗ №2)
 
-**Область:** FR-07 и связанные FR-03, FR-16, NFR-02. **Источники:** [Requirements 1.0](../pz01/REQUIREMENTS.md), [TEST_CASES_ARTEM.md](TEST_CASES_ARTEM.md), [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md), [MUTATION_ARTEM.md](MUTATION_ARTEM.md), `app/services.py`, `app/web/router.py`, `app/models.py` и фактические результаты наборов.
+**Область:** FR-07 и связанные FR-03, FR-16, NFR-02. **Источники:** [Requirements 1.0](../pz01/REQUIREMENTS.md), [SCHEDULE_TEST_CASES.md](SCHEDULE_TEST_CASES.md), [SCHEDULE_COVERAGE.md](SCHEDULE_COVERAGE.md), [SCHEDULE_MUTATION_EXPERIMENT.md](SCHEDULE_MUTATION_EXPERIMENT.md), `app/services.py`, `app/web/router.py`, `app/models.py` и фактические результаты наборов.
 
 **Границы доказательства:** предыдущий набор содержал 31 PASS из 31 собранной проверки; в этом дополнительном этапе добавлены 5 прямых POST-вариантов (A-SCH-25/26), и текущий индивидуальный набор содержит 36 кейсов. Исторический mutation-эксперимент A-SCH-04 дал поведенческий FAIL, после восстановления — 31 PASS на тогдашнем наборе. Актуальные результаты дополнительного этапа приведены ниже; исторические прогоны не выдаются за текущие. Фикстура использует отдельную in-memory SQLite на каждый тест, подменяет `get_db` и `get_current_teacher`, поэтому не проверяет реальный вход/сессию/CSRF расписания. PostgreSQL CI проверяет миграции, не расписательные сценарии. Для опубликованного SHA `54bf940b9e428fb4eae92a4488059542451055eb` GitHub Actions run [#38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377) завершился успешно (`verify` — `Success`).
 
@@ -118,7 +118,7 @@ node --test tests/auth-wizard.test.cjs tests/student-lifecycle.test.cjs
 node tests/test_session_fetch.cjs
 ```
 
-Покрытие воспроизводится командой из [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md); условия мутационного эксперимента и точный patch — в [MUTATION_ARTEM.md](MUTATION_ARTEM.md). Локальный общий `TEST_PLAN.md` прочитан только для контекста, не отслеживается Git и не является источником утверждённого правила. Самостоятельное [предложение по FR-07](../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md) также имеет статус PENDING. Данные в `pyproject.toml` и `COVERAGE_ARTEM.md` отражают фактическое состояние pytest-cov.
+Покрытие воспроизводится командой из [SCHEDULE_COVERAGE.md](SCHEDULE_COVERAGE.md); условия мутационного эксперимента и точный patch — в [SCHEDULE_MUTATION_EXPERIMENT.md](SCHEDULE_MUTATION_EXPERIMENT.md). Локальный общий `TEST_PLAN.md` прочитан только для контекста, не отслеживается Git и не является источником утверждённого правила. Самостоятельное [предложение по FR-07](../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md) также имеет статус PENDING. Данные в `pyproject.toml` и `SCHEDULE_COVERAGE.md` отражают фактическое состояние pytest-cov.
 
 ### Проверка высоких рисков
 
@@ -129,7 +129,7 @@ node tests/test_session_fetch.cjs
 - **R-SCH-07:** A-SCH-09/12 не реализованы и не имеют статуса PASS/FAIL; существующие тесты не снижают риск расхождения продуктовой политики.
 - **R-SCH-08:** прямой расписательной проверки реальной cookie/CSRF/role нет; нужен A-SCH-21. Отдельные auth-тесты не заменяют интеграцию с расписательным маршрутом.
 
-Локальная проверка после исправлений по ревью (2026-10-12): индивидуальный pytest — 36 PASS, полный Python pytest — 222 PASS; оба прогона с одним `StarletteDeprecationWarning`. JavaScript — 34 PASS; session-fetch — 6 PASS. Фокусный замер покрытия ветвей для 36 вариантов завершился успешно: показатель Cover для целых файлов `app/services.py` — 64%, `app/web/router.py` — 38%, оба файла — 45%; детали и ограничения приведены в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Для review-коммита `8c60b666848cf5cd723796de707f4ddf1d9d6bb3` Actions run [#38282040226](https://github.com/esnstwa/TutorFlow/actions/runs/38282040226) завершился успешно (`verify` — `Success`).
+Локальная проверка после исправлений по ревью (2026-10-12): индивидуальный pytest — 36 PASS, полный Python pytest — 222 PASS; оба прогона с одним `StarletteDeprecationWarning`. JavaScript — 34 PASS; session-fetch — 6 PASS. Фокусный замер покрытия ветвей для 36 вариантов завершился успешно: показатель Cover для целых файлов `app/services.py` — 64%, `app/web/router.py` — 38%, оба файла — 45%; детали и ограничения приведены в [SCHEDULE_COVERAGE.md](SCHEDULE_COVERAGE.md). Для review-коммита `8c60b666848cf5cd723796de707f4ddf1d9d6bb3` Actions run [#38282040226](https://github.com/esnstwa/TutorFlow/actions/runs/38282040226) завершился успешно (`verify` — `Success`).
 
 ### Для реальной интеграционной среды
 

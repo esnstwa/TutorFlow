@@ -75,15 +75,15 @@ jobs:
           test "$(uv run --locked --no-sync python -m alembic heads | grep -c '(head)')" -eq 1
           uv run --locked --no-sync python -m alembic current
           uv run --locked --no-sync python -m alembic check
-      - name: Measure Artyom schedule coverage
+      - name: Measure schedule coverage
         run: >-
           uv run --locked --no-sync python -m pytest tests/test_schedule_pz02.py -q
           --cov=app.services
           --cov=app.web.router
           --cov-branch
           --cov-report=term-missing
-          --cov-report=xml:coverage-artem.xml
-          --cov-report=json:coverage-artem.json
+          --cov-report=xml:coverage-schedule.xml
+          --cov-report=json:coverage-schedule.json
       - name: Build and verify wheel package
         run: >-
           uv run --locked --no-sync python scripts/build_component.py wheel
@@ -94,12 +94,12 @@ jobs:
           uv run --locked --no-sync python scripts/verify_wheel_runtime.py
           --wheel "$RUNNER_TEMP/tutorflow-wheel/tutorflow-0.1.0-py3-none-any.whl"
           --expected-sha "$(git rev-parse --short=12 HEAD)"
-      - name: Upload Artyom schedule coverage
+      - name: Upload schedule coverage
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-artem
+          name: coverage-schedule
           path: |
-            coverage-artem.xml
-            coverage-artem.json
+            coverage-schedule.xml
+            coverage-schedule.json
           if-no-files-found: warn

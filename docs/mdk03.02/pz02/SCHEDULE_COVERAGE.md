@@ -1,7 +1,7 @@
 # Анализ покрытия — расписание Артёма (ПЗ №2)
 
 **Дата:** 2026-10-12. **Текущая область тестового запуска:** только `tests/test_schedule_pz02.py` (36 собранных вариантов); никаких других pytest-тестов не участвовало в coverage-запуске.
-**Риск-ориентированный пересмотр:** [RISK_REGISTER_ARTEM.md](RISK_REGISTER_ARTEM.md). Общий локальный `TEST_PLAN.md` не отслеживается Git; его замечание о pytest-cov/coverage — исторический baseline, не текущее состояние и не утверждённое требование. Предложенное уточнение FR-07 со статусом PENDING описано в [`../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md`](../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md). Общая `tests/conftest.py` всё ещё создаёт свою session-scoped seed-БД, но проверки расписания используют отдельную in-memory SQLite-БД на каждый test case; seed не вызывает расписание-сервисы или router endpoints.
+**Риск-ориентированный пересмотр:** [SCHEDULE_RISK_REGISTER.md](SCHEDULE_RISK_REGISTER.md). Общий локальный `TEST_PLAN.md` не отслеживается Git; его замечание о pytest-cov/coverage — исторический baseline, не текущее состояние и не утверждённое требование. Предложенное уточнение FR-07 со статусом PENDING описано в [`../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md`](../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md). Общая `tests/conftest.py` всё ещё создаёт свою session-scoped seed-БД, но проверки расписания используют отдельную in-memory SQLite-БД на каждый test case; seed не вызывает расписание-сервисы или router endpoints.
 
 ## Среда
 
@@ -15,7 +15,7 @@
 Параметры `--cov=app.services --cov=app.web.router --cov-branch` ограничивают сбор этими двумя модулями и включают branch arcs. XML/JSON в команде создаются относительно корня репозитория; `.coverage` — локальный файл данных pytest-cov:
 
 ```text
-python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:coverage-artem.xml --cov-report=json:coverage-artem.json
+python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:coverage-schedule.xml --cov-report=json:coverage-schedule.json
 36 passed, 0 failed, 0 skipped, 1 warning (3.94s)
 
 python -m pytest -q
@@ -56,7 +56,7 @@ python -m pytest -q
 - По API расписания первоначально оставался guard для JSON не-объекта в `payload_dict` (`app/web/router.py:61–62`); добавлен вариант A-SCH-18. Теперь страница `/schedule` (91–93), payload guard и выбранные lesson API участки имеют 100% строк и всех conditional branch arcs в измеренных диапазонах.
 - В `app/web/router.py` ещё пропущены ветви других teacher/student/homework endpoints; в целом модуль имеет 112 непокрытых branch arcs, но 0 partially covered branch points. Это не расписание-специфичные проверки и новые тесты за пределами FR-07 не добавлялись.
 - Правило, блокируют ли занятое время занятия со статусом `cancelled`, и политика касания `end == next.start` не определены FR-07. A-SCH-09/A-SCH-12 остаются на согласование; тесты не закрепляют ни текущую реализацию, ни рекомендованный вариант.
-- Schedule error paths проверены: чужой/архивный ученик, пустая тема через совместимый и прямой POST, неизвестный статус при создании/обновлении, отсутствие поля переноса, отсутствующий ID, удаление, не-объектный payload и rollback при DB CHECK error; прямое создание также покрывает заметки длиной 0/500/501 и отсутствие записи при отказе. A-SCH-14…20 и A-SCH-25/26 описаны в `TEST_CASES_ARTEM.md`.
+- Schedule error paths проверены: чужой/архивный ученик, пустая тема через совместимый и прямой POST, неизвестный статус при создании/обновлении, отсутствие поля переноса, отсутствующий ID, удаление, не-объектный payload и rollback при DB CHECK error; прямое создание также покрывает заметки длиной 0/500/501 и отсутствие записи при отказе. A-SCH-14…20 и A-SCH-25/26 описаны в `SCHEDULE_TEST_CASES.md`.
 
 ### Базовый замер до дополнительных coverage-кейсов
 
@@ -64,7 +64,7 @@ python -m pytest -q
 
 ## CI
 
-`quality-gate.yml` сохраняет compileall, полный `pytest`, JavaScript и PostgreSQL/Alembic-проверки. Теперь последовательность job: полный Python-набор → JavaScript → PostgreSQL/Alembic → focused coverage → загрузка артефакта. Coverage выполняется только после остальных проверок; его ненулевой exit code завершает job ошибкой. Шаг upload-artifact с `if: always()` следует за coverage и сохраняет XML/JSON под именем `coverage-artem` (если файлы не созданы — warning). Порог покрытия не установлен; проверки не отключались и не ослаблялись.
+`quality-gate.yml` сохраняет compileall, полный `pytest`, JavaScript и PostgreSQL/Alembic-проверки. Теперь последовательность job: полный Python-набор → JavaScript → PostgreSQL/Alembic → focused coverage → загрузка артефакта. Coverage выполняется только после остальных проверок; его ненулевой exit code завершает job ошибкой. Шаг upload-artifact с `if: always()` следует за coverage и сохраняет XML/JSON под именем `coverage-schedule` (если файлы не созданы — warning). Порог покрытия не установлен; проверки не отключались и не ослаблялись.
 
 Локально подтверждены разбор `pyproject.toml` через `tomllib`, разбор workflow через PyYAML, порядок обязательных шагов и политика сохранения артефакта при ошибке. `pip check` чист; финальный `pip install --dry-run -e '.[dev]'` с build isolation завершился успешно: editable-пакет и зависимости разрешены без установки. Ранее пробный dry-run с `--no-build-isolation` завершился `Cannot import 'setuptools.build_meta'` (setuptools отсутствовал в активной venv); стандартный build isolation устранил ограничение. `actionlint` в окружении отсутствует, поэтому семантическая lint-проверка workflow локально недоступна. При финальном аудите Actions обновлены до Node 24-совместимых major versions; команды JS-тестов и миграций сохранены.
 
@@ -72,4 +72,4 @@ python -m pytest -q
 
 Для review-коммита `8c60b666848cf5cd723796de707f4ddf1d9d6bb3` GitHub Actions run [#38282040226](https://github.com/esnstwa/TutorFlow/actions/runs/38282040226) завершился со статусом `Success`; job `verify` также завершился `Success`. Артефакт `coverage-artem` проверен и содержит `coverage-artem.xml` и `coverage-artem.json`; JSON-итоги совпадают с локальным фокусным coverage-запуском выше.
 
-Coverage XML/JSON отчёты хранятся как CI artifact, а не коммитятся в репозиторий. Порог намеренно не задан. Мутационный эксперимент выполнен после этого этапа; фактические результаты и patch приведены в [MUTATION_ARTEM.md](MUTATION_ARTEM.md). Последующий риск-ориентированный пересмотр и оставшиеся интеграционные ограничения приведены в [RISK_REGISTER_ARTEM.md](RISK_REGISTER_ARTEM.md).
+Coverage XML/JSON отчёты хранятся как CI artifact, а не коммитятся в репозиторий. Порог намеренно не задан. Мутационный эксперимент выполнен после этого этапа; фактические результаты и patch приведены в [SCHEDULE_MUTATION_EXPERIMENT.md](SCHEDULE_MUTATION_EXPERIMENT.md). Последующий риск-ориентированный пересмотр и оставшиеся интеграционные ограничения приведены в [SCHEDULE_RISK_REGISTER.md](SCHEDULE_RISK_REGISTER.md).
