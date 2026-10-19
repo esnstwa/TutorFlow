@@ -4,7 +4,6 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -28,21 +27,15 @@ from app.models import (
     Student,
     User,
 )
+from app.schedule.calendar import CalendarEventService, MOSCOW, localize
+from app.schedule.sqlalchemy_source import SQLAlchemyCalendarEventSource
 
-MOSCOW = ZoneInfo("Europe/Moscow")
 LESSON_STATUSES = {"scheduled", "completed_unpaid", "completed_paid", "cancelled"}
 MONTHS = ("", "января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
 
 
 def local_datetime(date_value: str, time_value: str) -> datetime:
     return datetime.combine(date.fromisoformat(date_value), time.fromisoformat(time_value), tzinfo=MOSCOW)
-
-
-def localize(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        # SQLite used by tests drops tzinfo; application datetimes are authored in Moscow time.
-        return value.replace(tzinfo=MOSCOW)
-    return value.astimezone(MOSCOW)
 
 
 def date_label(value: datetime) -> str:
@@ -262,32 +255,55 @@ def notification_rows(db: Session, teacher_id: int) -> list[dict[str, Any]]:
 
 
 def calendar_events(db: Session, teacher: User, *, date_from: date | None = None, date_to: date | None = None) -> list[dict[str, Any]]:
-    stmt = select(Lesson).options(
-        selectinload(Lesson.student).selectinload(Student.user),
-        selectinload(Lesson.materials),
-        selectinload(Lesson.homeworks).selectinload(Homework.attachments),
-        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.student),
-        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.submissions),
-        selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.reviews),
-    ).where(Lesson.teacher_id == teacher.id)
-    if date_from:
-        stmt = stmt.where(Lesson.start_at >= datetime.combine(date_from, time.min, tzinfo=MOSCOW))
-    if date_to:
-        stmt = stmt.where(Lesson.start_at < datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=MOSCOW))
-    lessons = list(db.scalars(stmt.order_by(Lesson.start_at)))
-    events = []
-    for lesson in lessons:
-        row = lesson_dict(lesson)
-        events.append({
-            "id": f"lesson-{lesson.id}", "entity_id": lesson.id, "type": "lessons",
-            "title": row["student"]["name"], "subtitle": f"{row['student']['subject']} · {row['topic']}",
-            "avatar": row["student"]["initials"], "date": row["date_iso"], "start": row["start"], "end": row["end"],
-            "url": f"/lessons/{lesson.id}", "draggable": True, "status": lesson.status, "lesson": row,
-        })
-    submissions = list(db.scalars(select(HomeworkRecipient).join(Homework).where(Homework.teacher_id == teacher.id, HomeworkRecipient.status == "SUBMITTED")))
-    for item in submissions:
-        submitted = localize(item.submitted_at)
-        events.append({"id": f"review-{item.id}", "type": "reviews", "title": "Проверка задания", "subtitle": "Работа ученика", "date": submitted.date().isoformat(), "start": submitted.strftime("%H:00"), "end": (submitted + timedelta(hours=1)).strftime("%H:00"), "url": f"/homework-recipients/{item.id}", "draggable": False})
+    """Compatibility entry point used by the schedule page and lessons API.
+
+    This is the production composition point: bind the shared consumer to the
+    caller's SQLAlchemy session and the existing lesson serializer. HTTP
+    consumers keep their original call and response shape.
+    """
+    source = SQLAlchemyCalendarEventSource(db, lesson_dict)
+    projected = CalendarEventService(source).list_events(
+        teacher_id=teacher.id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    events: list[dict[str, Any]] = []
+    for event in projected:
+        if event.kind == "lesson":
+            row = event.details
+            assert row is not None
+            student = row["student"]
+            events.append(
+                {
+                    "id": f"lesson-{event.entity_id}",
+                    "entity_id": event.entity_id,
+                    "type": "lessons",
+                    "title": student["name"],
+                    "subtitle": f"{student['subject']} · {row['topic']}",
+                    "avatar": student["initials"],
+                    "date": event.start_at.date().isoformat(),
+                    "start": event.start_at.strftime("%H:%M"),
+                    "end": event.end_at.strftime("%H:%M"),
+                    "url": f"/lessons/{event.entity_id}",
+                    "draggable": True,
+                    "status": event.status,
+                    "lesson": row,
+                }
+            )
+        else:
+            events.append(
+                {
+                    "id": f"review-{event.entity_id}",
+                    "type": "reviews",
+                    "title": "Проверка задания",
+                    "subtitle": "Работа ученика",
+                    "date": event.start_at.date().isoformat(),
+                    "start": event.start_at.strftime("%H:%M"),
+                    "end": event.end_at.strftime("%H:%M"),
+                    "url": f"/homework-recipients/{event.entity_id}",
+                    "draggable": False,
+                }
+            )
     return events
 
 
