@@ -1,0 +1,9 @@
+TutorFlow ПЗ №1 — Р3: invalid APP_ENV is rejected safely
+==============================================================================
+$ APP_ENV=invalid-pz01-value python -m app.core.runtime_diagnostics
+INFO component_start
+configuration_error: app_env: Input should be 'production', 'development', 'local' or 'test'
+INFO component_result status=error
+
+EXIT=2
+The diagnostic reports the field-level validation error and does not print the supplied value as a secret or configuration dump.

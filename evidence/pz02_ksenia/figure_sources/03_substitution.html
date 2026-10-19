@@ -1,0 +1,118 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Рисунок 3 — подмена</title><style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f6f8; color: #17212b; font-family: Consolas, 'Courier New', monospace; }
+.page { width: 1500px; min-height: 900px; margin: 0 auto; padding: 28px 34px; background: white; }
+h1 { font: 700 28px Arial, sans-serif; color: #173b63; margin: 0 0 18px; }
+h2 { font: 700 18px Arial, sans-serif; color: #285b8f; margin: 18px 0 8px; }
+.meta { font: 14px Arial, sans-serif; color: #4b5965; margin-bottom: 18px; }
+pre { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.35; margin: 0; padding: 16px; border: 1px solid #c8d4df; border-radius: 6px; background: #f8fafc; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { border: 1px solid #c8d4df; border-radius: 6px; padding: 14px; background: #fbfdff; }
+.badge { display: inline-block; padding: 4px 8px; border-radius: 12px; background: #d9f2df; color: #176b2b; font: 700 13px Arial, sans-serif; }
+.pending { background: #fff1c7; color: #7b5600; }
+table { width: 100%; border-collapse: collapse; font: 14px Arial, sans-serif; }
+th, td { border: 1px solid #b9c7d3; padding: 9px; text-align: left; vertical-align: top; }
+th { background: #e8f0f7; color: #173b63; }
+.flow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 24px 0; }
+.node { border: 2px solid #3d6f9f; border-radius: 8px; padding: 14px; min-width: 250px; text-align: center; font: 700 15px Arial, sans-serif; background: #eef6ff; }
+.arrow { font: 700 28px Arial, sans-serif; color: #3d6f9f; }
+.small { font: 12px Arial, sans-serif; color: #5e6b76; }
+</style></head><body><main class='page'>
+<h1>Рисунок 3 — один потребитель и подключение двух реализаций</h1>
+<div class='meta'><span class='badge'>same consumer</span> parametrized contract test + FastAPI dependency override</div>
+<div class='grid'><div class='card'><h2>Test-only FixedPasswordVerifier</h2><pre>from collections.abc import Mapping
+
+
+class FixedPasswordVerifier:
+    &quot;&quot;&quot;Test-only substitute implementing the auth password-verifier contract.&quot;&quot;&quot;
+
+    def __init__(self, answers: Mapping[tuple[str, str], bool]) -&gt; None:
+        self._answers = dict(answers)
+
+    def verify(self, password: str, password_hash: str) -&gt; bool:
+        return self._answers.get((password, password_hash), False)
+</pre></div><div class='card'><h2>One login consumer / two implementations</h2><pre>@pytest.mark.parametrize(&quot;implementation&quot;, [&quot;argon2&quot;, &quot;fixed&quot;])
+def test_password_verifier_contract_covers_normal_boundary_and_error_inputs(implementation):
+    password = &quot;Password123&quot;
+    if implementation == &quot;argon2&quot;:
+        stored_hash = hash_password(password)
+        verifier = Argon2PasswordVerifier()
+    else:
+        stored_hash = &quot;not-an-argon2-hash&quot;
+        verifier = FixedPasswordVerifier({(password, stored_hash): True})
+
+    assert verifier.verify(password, stored_hash) is True
+    assert verifier.verify(&quot;Wrong123&quot;, stored_hash) is False
+    assert verifier.verify(&quot;&quot;, stored_hash) is False
+    assert verifier.verify(password, &quot;&quot;) is False
+    assert verifier.verify(password, &quot;malformed&quot;) is False
+
+
+@pytest.mark.parametrize(&quot;implementation&quot;, [&quot;argon2&quot;, &quot;fixed&quot;])
+def test_one_login_consumer_accepts_both_verifier_implementations(implementation):
+    password = &quot;Password123&quot;
+    email = f&quot;contract-{uuid4().hex}@example.com&quot;
+    if implementation == &quot;argon2&quot;:
+        stored_hash = hash_password(password)
+        verifier = Argon2PasswordVerifier()
+    else:
+        stored_hash = &quot;test-only-stored-value&quot;
+        verifier = FixedPasswordVerifier({(password, stored_hash): True})
+
+    with TestingSessionLocal() as db:
+        db.add(User(email=email, password_hash=stored_hash, first_name=&quot;Анна&quot;, last_name=&quot;&quot;, role=&quot;teacher&quot;))
+        db.commit()
+
+    previous = app.dependency_overrides.get(get_password_verifier)
+    app.dependency_overrides[get_password_verifier] = lambda: verifier
+    try:
+        with TestClient(app, base_url=&quot;https://testserver&quot;, follow_redirects=False) as client:
+            response = client.post(
+                &quot;/api/auth/login&quot;,
+                json={&quot;email&quot;: email, &quot;password&quot;: password, &quot;remember&quot;: False},
+                headers={&quot;X-TutorFlow-Request&quot;: &quot;auth&quot;},
+            )
+    finally:
+        if previous is None:
+            app.dependency_overrides.pop(get_password_verifier, None)
+        else:
+            app.dependency_overrides[get_password_verifier] = previous
+
+    assert response.status_code == 200
+    assert response.json()[&quot;user&quot;][&quot;email&quot;] == email
+
+
+def test_default_password_verifier_is_production_argon2_implementation():
+    assert isinstance(get_password_verifier(), Argon2PasswordVerifier)
+
+
+def test_argon2_verifier_rejects_non_ascii_malformed_hash():
+    assert Argon2PasswordVerifier().verify(&quot;Password123&quot;, &quot;не-argon2-хэш&quot;) is False
+
+
+def test_login_maps_non_ascii_malformed_hash_to_generic_401_without_session():
+    from sqlalchemy import select
+
+    from app.auth.models import AuthSession
+
+    email = f&quot;malformed-{uuid4().hex}@example.com&quot;
+    with TestingSessionLocal() as db:
+        db.add(User(email=email, password_hash=&quot;не-argon2-хэш&quot;, first_name=&quot;Анна&quot;, last_name=&quot;&quot;, role=&quot;teacher&quot;))
+        db.commit()
+
+    with TestClient(app, base_url=&quot;https://testserver&quot;, follow_redirects=False) as client:
+        response = client.post(
+            &quot;/api/auth/login&quot;,
+            json={&quot;email&quot;: email, &quot;password&quot;: &quot;Password123&quot;, &quot;remember&quot;: False},
+            headers={&quot;X-TutorFlow-Request&quot;: &quot;auth&quot;},
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {&quot;detail&quot;: &quot;Неверный email или пароль&quot;}
+    assert &quot;tutorflow_session&quot; not in response.headers.get(&quot;set-cookie&quot;, &quot;&quot;)
+    with TestingSessionLocal() as db:
+        user = db.scalar(select(User).where(User.email == email))
+        assert db.scalars(select(AuthSession).where(AuthSession.user_id == user.id)).all() == []
+</pre></div></div>
+</main></body></html>

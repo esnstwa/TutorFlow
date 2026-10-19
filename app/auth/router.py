@@ -2,7 +2,6 @@ import secrets
 from datetime import timedelta
 from urllib.parse import parse_qs
 
-from argon2.exceptions import InvalidHashError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
@@ -11,12 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.csrf import check_origin, require_csrf
 from app.auth.models import AuthSession
+from app.auth.passwords import PasswordVerifier, get_password_verifier
 from app.auth.schemas import FIELD_MESSAGES, LoginRequest, RegisterRequest
 from app.auth.sessions import COOKIE_NAME, resolve_session, token_digest
 from app.core.auth import get_current_user, optional_current_user
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import verify_password
 from app.models import User, utc_now
 from app.users.exceptions import UserAlreadyExistsError
 from app.users.service import create_user
@@ -45,14 +44,29 @@ def public_user(user: User) -> dict:
     return {key: getattr(user, key) for key in ("id", "email", "role", "first_name", "last_name")}
 
 
+def _session_expiry(lifetime: int):
+    try:
+        return utc_now() + timedelta(seconds=lifetime)
+    except OverflowError:
+        raise HTTPException(
+            status_code=500,
+            detail="Не удалось безопасно рассчитать срок действия сессии",
+        ) from None
+
+
 def authenticated_response(request: Request, db: Session, user: User, status_code=200, remember=False):
+    lifetime = (
+        settings.remember_session_lifetime_seconds
+        if remember
+        else settings.session_lifetime_seconds
+    )
+    expires_at = _session_expiry(lifetime)
     old_session = resolve_session(request, db)
     if old_session is not None:
         old_session.revoked_at = utc_now()
-    lifetime = 2592000 if remember else 43200
     raw = secrets.token_urlsafe(32)
     session = AuthSession(user_id=user.id, token_hash=token_digest(raw),
-                          csrf_token=secrets.token_urlsafe(32), expires_at=utc_now() + timedelta(seconds=lifetime))
+                          csrf_token=secrets.token_urlsafe(32), expires_at=expires_at)
     db.add(session)
     db.commit()
     response = JSONResponse({"ok": True, "user": public_user(user),
@@ -100,16 +114,14 @@ async def logout(request: Request, db: Session = Depends(get_db), user=Depends(g
 
 
 @router.post("/api/auth/login")
-async def login(request: Request, db: Session = Depends(get_db)):
+async def login(request: Request, db: Session = Depends(get_db),
+                password_verifier: PasswordVerifier = Depends(get_password_verifier)):
     data = await validated_json(request, LoginRequest)
     if isinstance(data, JSONResponse):
         return data
     email = str(data.email).lower()
     user = db.scalar(select(User).where(User.email == email))
-    try:
-        valid = user is not None and verify_password(data.password, user.password_hash)
-    except InvalidHashError:
-        valid = False
+    valid = user is not None and password_verifier.verify(data.password, user.password_hash)
     if not valid:
         return JSONResponse({"detail": "Неверный email или пароль"}, status_code=401)
     return authenticated_response(request, db, user, remember=data.remember)
