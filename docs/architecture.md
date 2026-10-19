@@ -35,6 +35,21 @@ TutorFlow — веб-платформа для взаимодействия ча
 
 Состав модулей и их внутреннее устройство уточняются на этапах реализации. Пустые директории заранее не создаются.
 
+### Фактическая карта модулей для ПЗ №2
+
+Карта ниже фиксирует зависимости исходного кода, а не только направление вызова. Статус `работает` означает, что путь подключён к приложению и проверен тестом; статус `план` оставлен только для ещё не реализованных продуктовых модулей.
+
+| Модуль | Ответственность и контракт | Фактические зависимости | Статус | Автор записи |
+|---|---|---|---|---|
+| `app.auth.router` | HTTP-сценарии регистрации, входа, выхода и `/api/auth/me`; `login` получает `PasswordVerifier` через `get_password_verifier` | `auth.passwords`, `auth.schemas`, `auth.sessions`, `core.auth`, `core.database`, `models`, `users.service` | работает | Ксения Иванова |
+| `app.auth.passwords` | Контракт `PasswordVerifier.verify(password, password_hash) -> bool`; `Argon2PasswordVerifier` скрывает Argon2 и возвращает `False` для mismatch/пустого ввода/невалидного хэша | `argon2-cffi` | работает | Ксения Иванова |
+| `app.users.service` | Создание пользователя: нормализация email, проверка уникальности, хэширование пароля и сохранение `User` | `core.security`, `users.models`, `users.schemas`, SQLAlchemy | работает | общий модуль проекта |
+| `app.core.auth` | Получение текущего пользователя/роли из серверской сессии и проверка CSRF | `auth.sessions`, `core.database`, `models`, `auth.csrf` | работает | общий модуль проекта |
+| `app.core.security` | Совместимый фасад хэширования; `verify_password` делегирует контракту `PasswordVerifier` | `auth.passwords`, `argon2-cffi` | работает | Ксения Иванова |
+| `tests.support.passwords` | Тестовая подмена `FixedPasswordVerifier` для воспроизведения результата контракта без Argon2 | `PasswordVerifier` по структурному контракту, pytest | работает (test-only) | Ксения Иванова |
+
+Зависимости для выбранного участка: `app.auth.router → app.auth.passwords`; `app.core.security → app.auth.passwords`; `app.users.service → app.core.security`; точка сборки FastAPI получает production-реализацию через `get_password_verifier`, а тесты могут заменить только эту зависимость. Потребитель `login` не импортирует Argon2 и не меняется при выборе `FixedPasswordVerifier`.
+
 ## Технологический стек
 
 - Python и FastAPI;

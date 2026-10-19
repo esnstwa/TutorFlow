@@ -2,7 +2,6 @@ import secrets
 from datetime import timedelta
 from urllib.parse import parse_qs
 
-from argon2.exceptions import InvalidHashError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
@@ -11,12 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.csrf import check_origin, require_csrf
 from app.auth.models import AuthSession
+from app.auth.passwords import PasswordVerifier, get_password_verifier
 from app.auth.schemas import FIELD_MESSAGES, LoginRequest, RegisterRequest
 from app.auth.sessions import COOKIE_NAME, resolve_session, token_digest
 from app.core.auth import get_current_user, optional_current_user
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import verify_password
 from app.models import User, utc_now
 from app.users.exceptions import UserAlreadyExistsError
 from app.users.service import create_user
@@ -115,16 +114,14 @@ async def logout(request: Request, db: Session = Depends(get_db), user=Depends(g
 
 
 @router.post("/api/auth/login")
-async def login(request: Request, db: Session = Depends(get_db)):
+async def login(request: Request, db: Session = Depends(get_db),
+                password_verifier: PasswordVerifier = Depends(get_password_verifier)):
     data = await validated_json(request, LoginRequest)
     if isinstance(data, JSONResponse):
         return data
     email = str(data.email).lower()
     user = db.scalar(select(User).where(User.email == email))
-    try:
-        valid = user is not None and verify_password(data.password, user.password_hash)
-    except InvalidHashError:
-        valid = False
+    valid = user is not None and password_verifier.verify(data.password, user.password_hash)
     if not valid:
         return JSONResponse({"detail": "Неверный email или пароль"}, status_code=401)
     return authenticated_response(request, db, user, remember=data.remember)
