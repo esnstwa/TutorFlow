@@ -44,31 +44,56 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
-      - name: Install Python dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Install locked Python dependencies
+        run: python -m pip install uv==0.11.21 && uv sync --locked --extra dev
       - name: Compile Python sources
-        run: python -m compileall -q app
+        run: uv run --locked --no-sync python -m compileall -q app
+      - name: Verify minimal runtime component
+        env:
+          TUTORFLOW_EXPECTED_SHA: ${{ github.sha }}
+        run: uv run --locked --no-sync python scripts/check_component.py
+      - name: Verify component check rejects a mismatched SHA
+        run: |
+          set +e
+          output="$(uv run --locked --no-sync python scripts/check_component.py --expected-sha 000000000000 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -ne 1 ] || ! printf '%s' "$output" | grep -Fq "SHA не совпал"; then
+            echo "component check did not reject the mismatched SHA as expected" >&2
+            exit 1
+          fi
       - name: Run Python tests
-        run: python -m pytest -q
+        run: uv run --locked --no-sync python -m pytest -q
       - name: Run JavaScript tests
         run: |
           node --test tests/auth-wizard.test.cjs tests/student-lifecycle.test.cjs
           node tests/test_session_fetch.cjs
       - name: Validate migrations on PostgreSQL
         run: |
-          python -m alembic upgrade head
-          test "$(python -m alembic heads | grep -c '(head)')" -eq 1
-          python -m alembic current
-          python -m alembic check
+          uv run --locked --no-sync python -m alembic upgrade head
+          test "$(uv run --locked --no-sync python -m alembic heads | grep -c '(head)')" -eq 1
+          uv run --locked --no-sync python -m alembic current
+          uv run --locked --no-sync python -m alembic check
       - name: Measure Artyom schedule coverage
         run: >-
-          python -m pytest tests/test_schedule_pz02.py -q
+          uv run --locked --no-sync python -m pytest tests/test_schedule_pz02.py -q
           --cov=app.services
           --cov=app.web.router
           --cov-branch
           --cov-report=term-missing
           --cov-report=xml:coverage-artem.xml
           --cov-report=json:coverage-artem.json
+      - name: Build and verify wheel package
+        run: >-
+          uv run --locked --no-sync python scripts/build_component.py wheel
+          --out-dir "$RUNNER_TEMP/tutorflow-wheel"
+          --work-dir "$RUNNER_TEMP"
+      - name: Verify installed wheel outside checkout and in another Git repository
+        run: >-
+          uv run --locked --no-sync python scripts/verify_wheel_runtime.py
+          --wheel "$RUNNER_TEMP/tutorflow-wheel/tutorflow-0.1.0-py3-none-any.whl"
+          --expected-sha "$(git rev-parse --short=12 HEAD)"
       - name: Upload Artyom schedule coverage
         if: always()
         uses: actions/upload-artifact@v7
