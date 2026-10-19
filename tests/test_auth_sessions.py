@@ -285,27 +285,73 @@ def test_api_logout_requires_csrf_revokes_session_and_deletes_cookie(client):
     assert client.get("/api/auth/me", headers={"Cookie": f"tutorflow_session={old}"}).status_code == 401
 
 
+def test_failed_login_without_active_session_creates_no_session_or_cookie(client):
+    from app.auth.models import AuthSession
+    from app.auth.sessions import COOKIE_NAME
+    from app.core.security import hash_password
+
+    data = payload()
+    with TestingSessionLocal() as db:
+        user = User(email=data["email"], password_hash=hash_password(data["password"]),
+                    first_name=data["first_name"], last_name=data["last_name"], role=data["role"])
+        db.add(user)
+        db.commit()
+        user_id = user.id
+        assert db.scalars(select(AuthSession).where(AuthSession.user_id == user_id)).all() == []
+
+    assert client.cookies.get(COOKIE_NAME) is None
+    response = client.post("/api/auth/login", json={"email": data["email"], "password": "bad", "remember": False}, headers={"X-TutorFlow-Request": "auth"})
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Неверный email или пароль"}
+    assert COOKIE_NAME not in response.headers.get("set-cookie", "")
+    assert client.cookies.get(COOKIE_NAME) is None
+
+    with TestingSessionLocal() as db:
+        assert db.scalars(select(AuthSession).where(AuthSession.user_id == user_id)).all() == []
+
+
 def test_login_verifies_password_rotates_cookie_and_remembers(client):
+    from app.auth.models import AuthSession
+    from app.auth.sessions import COOKIE_NAME, token_digest
+
     data = payload()
     registered = client.post("/api/auth/register", json=data, headers={"X-TutorFlow-Request": "auth"}).json()
-    old_cookie = client.cookies.get("tutorflow_session")
+    old_cookie = client.cookies.get(COOKIE_NAME)
+    with TestingSessionLocal() as db:
+        old_session = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_digest(old_cookie)))
+        assert old_session is not None
+        old_session_id = old_session.id
+        old_csrf_token = old_session.csrf_token
+        session_count_before_bad = len(db.scalars(select(AuthSession).where(AuthSession.user_id == registered["user"]["id"])).all())
+
     bad = client.post("/api/auth/login", json={"email": data["email"], "password": "bad", "remember": False}, headers={"X-TutorFlow-Request": "auth"})
     assert bad.status_code == 401
     assert bad.json() == {"detail": "Неверный email или пароль"}
+    assert COOKIE_NAME not in bad.headers.get("set-cookie", "")
+    assert client.cookies.get(COOKIE_NAME) == old_cookie
+    with TestingSessionLocal() as db:
+        unchanged_session = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_digest(old_cookie)))
+        assert unchanged_session is not None
+        assert unchanged_session.id == old_session_id
+        assert unchanged_session.revoked_at is None
+        assert unchanged_session.csrf_token == old_csrf_token
+        assert len(db.scalars(select(AuthSession).where(AuthSession.user_id == registered["user"]["id"])).all()) == session_count_before_bad
+    old_session_response = client.get("/api/auth/me", headers={"Cookie": f"{COOKIE_NAME}={old_cookie}"})
+    assert old_session_response.status_code == 200
+    assert old_session_response.json()["csrf_token"] == old_csrf_token
+
     good = client.post("/api/auth/login", json={"email": " " + data["email"].upper() + " ", "password": data["password"], "remember": True}, headers={"X-TutorFlow-Request": "auth"})
     assert good.status_code == 200
     assert good.json()["user"] == registered["user"]
-    assert client.cookies.get("tutorflow_session") != old_cookie
+    assert client.cookies.get(COOKIE_NAME) != old_cookie
     assert good.json()["csrf_token"] != registered["csrf_token"]
     assert client.post("/api/protected/teacher", headers={"X-CSRF-Token": registered["csrf_token"]}).status_code == 403
     assert client.post("/api/protected/teacher", headers={"X-CSRF-Token": good.json()["csrf_token"]}).status_code == 200
     assert "Max-Age=2592000" in good.headers["set-cookie"]
-    from app.auth.models import AuthSession
-    from app.auth.sessions import token_digest
     with TestingSessionLocal() as db:
-        current = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_digest(client.cookies.get("tutorflow_session"))))
+        current = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_digest(client.cookies.get(COOKIE_NAME))))
         assert (current.expires_at - current.created_at).total_seconds() == pytest.approx(2592000, abs=1)
-    old = client.get("/api/auth/me", headers={"Cookie": f"tutorflow_session={old_cookie}"})
+    old = client.get("/api/auth/me", headers={"Cookie": f"{COOKIE_NAME}={old_cookie}"})
     assert old.status_code == 401
 
 
