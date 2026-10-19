@@ -45,18 +45,29 @@ def public_user(user: User) -> dict:
     return {key: getattr(user, key) for key in ("id", "email", "role", "first_name", "last_name")}
 
 
+def _session_expiry(lifetime: int):
+    try:
+        return utc_now() + timedelta(seconds=lifetime)
+    except OverflowError:
+        raise HTTPException(
+            status_code=500,
+            detail="Не удалось безопасно рассчитать срок действия сессии",
+        ) from None
+
+
 def authenticated_response(request: Request, db: Session, user: User, status_code=200, remember=False):
-    old_session = resolve_session(request, db)
-    if old_session is not None:
-        old_session.revoked_at = utc_now()
     lifetime = (
         settings.remember_session_lifetime_seconds
         if remember
         else settings.session_lifetime_seconds
     )
+    expires_at = _session_expiry(lifetime)
+    old_session = resolve_session(request, db)
+    if old_session is not None:
+        old_session.revoked_at = utc_now()
     raw = secrets.token_urlsafe(32)
     session = AuthSession(user_id=user.id, token_hash=token_digest(raw),
-                          csrf_token=secrets.token_urlsafe(32), expires_at=utc_now() + timedelta(seconds=lifetime))
+                          csrf_token=secrets.token_urlsafe(32), expires_at=expires_at)
     db.add(session)
     db.commit()
     response = JSONResponse({"ok": True, "user": public_user(user),

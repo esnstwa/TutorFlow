@@ -1,24 +1,14 @@
-from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-_SECONDS_PER_DAY = 24 * 60 * 60
-
-
-def _datetime_safe_lifetime_seconds() -> int:
-    """Return a technical bound that keeps session expiry representable."""
-    remaining = datetime.max.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)
-    remaining_seconds = remaining.days * _SECONDS_PER_DAY + remaining.seconds
-    return max(1, remaining_seconds - _SECONDS_PER_DAY)
-
-
-# This is a datetime representability limit, not a product lifetime policy.
-# The one-day margin prevents a Settings instance from becoming invalid merely
-# because the process runs between configuration loading and session creation.
-MAX_SESSION_LIFETIME_SECONDS = _datetime_safe_lifetime_seconds()
+# This fixed ten-year bound is a technical configuration limit, not a product
+# lifetime policy. It is well above the 30-day default and does not depend on
+# when the process imported this module; runtime expiry calculation still
+# checks the actual current datetime before creating a session.
+MAX_SESSION_LIFETIME_SECONDS = 10 * 365 * 24 * 60 * 60
 
 
 class Settings(BaseSettings):

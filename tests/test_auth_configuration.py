@@ -1,14 +1,17 @@
 import os
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import select
 
+from app.auth import router as auth_router
 from app.auth.models import AuthSession
 from app.auth.sessions import COOKIE_NAME, token_digest
 from app.core.config import MAX_SESSION_LIFETIME_SECONDS, Settings, settings
@@ -71,6 +74,42 @@ def test_session_settings_accept_only_datetime_safe_upper_boundary(field: str) -
         Settings(_env_file=None, **{field: MAX_SESSION_LIFETIME_SECONDS + 1})
 
     assert field in {str(error["loc"][0]) for error in raised.value.errors()}
+
+
+def test_max_session_lifetime_stays_safe_after_process_ages_more_than_one_day(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "session_lifetime_seconds", MAX_SESSION_LIFETIME_SECONDS)
+    later = datetime.now(timezone.utc) + timedelta(days=1, seconds=1)
+    monkeypatch.setattr(auth_router, "utc_now", lambda: later)
+    email = f"long-lived-{uuid4().hex}@example.com"
+
+    response = client.post(
+        "/api/auth/register", json=_payload(email), headers=AUTH_HEADERS
+    )
+
+    assert response.status_code == 201
+    raw_cookie = client.cookies.get(COOKIE_NAME)
+    assert raw_cookie is not None
+    session = _session_for_cookie(raw_cookie)
+    assert session.expires_at.replace(tzinfo=timezone.utc) == later + timedelta(
+        seconds=MAX_SESSION_LIFETIME_SECONDS
+    )
+
+
+def test_session_expiry_overflow_is_reported_as_controlled_http_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    near_datetime_max = datetime.max.replace(tzinfo=timezone.utc) - timedelta(
+        seconds=MAX_SESSION_LIFETIME_SECONDS - 1
+    )
+    monkeypatch.setattr(auth_router, "utc_now", lambda: near_datetime_max)
+
+    with pytest.raises(HTTPException) as raised:
+        auth_router._session_expiry(MAX_SESSION_LIFETIME_SECONDS)
+
+    assert raised.value.status_code == 500
+    assert raised.value.detail == "Не удалось безопасно рассчитать срок действия сессии"
 
 
 @pytest.mark.parametrize("field", ["session_lifetime_seconds", "remember_session_lifetime_seconds"])
