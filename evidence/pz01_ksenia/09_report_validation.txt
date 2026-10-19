@@ -1,0 +1,17 @@
+docx_validate:
+{"ok": true, "issues": []}
+
+summary_checks:
+contains_295_passed= True
+contains_74_passed= True
+contains_84_passed= False
+contains_296_passed= False
+contains_10_tests= True
+contains_old_cross_field_rule_as_requirement= False
+contains_explanation_rule_not_introduced= True
+
+visual_check:
+word_available=yes
+inspected=cover and contents pages in Microsoft Word
+formatting_observed=pages render, tables and seven evidence figures are present
+remaining_template_placeholders=КАФЕДРА № [указать], Группа: [указать], [ФИО], преподаватель fields

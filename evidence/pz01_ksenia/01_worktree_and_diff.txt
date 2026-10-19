@@ -1,0 +1,11 @@
+TutorFlow ПЗ №1 — локальная рабочая доказательная база
+worktree=/c/Users/kseni/AppData/Local/hermes/cache/scratch/tutorflow-pz01-auth-config-20261019
+base_head=3a3f23e2743b4798b9402fa3cc7c298c3a9d834c
+base_origin_main=3a3f23e2743b4798b9402fa3cc7c298c3a9d834c
+status_before_evidence:
+## HEAD (no branch)
+ M app/auth/router.py
+ M app/core/config.py
+?? evidence/
+?? tests/test_auth_configuration.py
+diff_check:
