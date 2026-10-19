@@ -1,37 +1,61 @@
-# Протокол независимой проверки ПЗ №2 (шаблон Р7)
+# Протокол взаимной проверки ПЗ №2 — `PasswordVerifier`
 
-Статус: **не выполнено**. Этот файл не является доказательством проверки до заполнения другим студентом.
+Статус: **техническая проверка выполнена; результаты записаны ниже**. В GitHub отправлен review с аккаунта `esnstwa`; автор PR — `iver-ks`.
 
-- Проверяющий: `[заполняет другой студент]`
-- Проект проверяющего: `[указать]`
-- Дата: `[указать]`
-- Зафиксированный commit: `[указать полный SHA после commit]`
+- Проверяющий (GitHub): `esnstwa`
+- Проект: TutorFlow (`esnstwa/TutorFlow`)
+- Дата локального воспроизведения: **20 октября 2026 г.**, UTC+03:00
+- Проверенный commit: `9a25e754fd6824e39fa0f7bb0b5f6d0081e85c44`
 - Репозиторий/ветка: `esnstwa/TutorFlow`, `feature/0104-pz02-ksenia`
+- Pull Request: [#17 — ПЗ №2: контракт и реализации проверки пароля](https://github.com/esnstwa/TutorFlow/pull/17)
+- GitHub review: `APPROVED` на указанном commit; PR впоследствии смержен.
 
-## Команды
+## Команды и фактические результаты
+
+Проверка выполнялась в отдельном detached worktree на точном SHA выше.
 
 ```text
-[ ] git fetch origin --prune
-[ ] git checkout <фиксированный SHA>
-[ ] uv sync --locked --extra dev
-[ ] uv run --locked --no-sync python -m pytest tests/test_auth_module_contract.py tests/test_auth_sessions.py -q
-[ ] uv run --locked --no-sync python -m compileall -q app tests
+git fetch origin pull/17/head
+exit code: 0
+FETCH_HEAD: 9a25e754fd6824e39fa0f7bb0b5f6d0081e85c44
+
+git worktree add --detach <путь-временного-worktree> 9a25e754fd6824e39fa0f7bb0b5f6d0081e85c44
+exit code: 0
+HEAD: 9a25e754fd6824e39fa0f7bb0b5f6d0081e85c44
+
+uv sync --locked --extra dev
+exit code: 0
+Среда: CPython 3.14.7; разрешено 47 пакетов, установлено 46.
+
+uv run --locked --no-sync python -m pytest tests/test_auth_module_contract.py tests/test_auth_sessions.py -q
+exit code: 0
+59 passed, 1 warning in 8.92s
+Предупреждение: StarletteDeprecationWarning о связке httpx и starlette.testclient.
+
+uv run --locked --no-sync python -m compileall -q app tests
+exit code: 0
 ```
 
 ## Проверяемые случаи
 
-- [ ] штатная пара для `Argon2PasswordVerifier`;
-- [ ] граничный пустой пароль;
-- [ ] ошибочный пароль;
-- [ ] пустой/искажённый хэш;
-- [ ] один и тот же `/api/auth/login` с production-реализацией и `FixedPasswordVerifier`;
-- [ ] потребитель не изменяется при подмене;
-- [ ] модульная карта соответствует фактическим импортам.
+- [x] Штатная пара для `Argon2PasswordVerifier`.
+- [x] Пустой пароль возвращает `False`.
+- [x] Неправильный пароль возвращает `False`.
+- [x] Пустой и искажённый хэш не дают успешной аутентификации.
+- [x] Один и тот же `/api/auth/login` проверен с production-реализацией и `FixedPasswordVerifier`.
+- [x] Проверен общий HTTP 401 при некорректном хэше; сессия не создаётся.
+- [x] Сверены фактические импорты и зависимости модульной карты.
 
-## Фактический результат
+## CI и результат review
 
-`[заполняется проверяющим: команды, exit codes, количество тестов, замечания]`
+- Обязательная проверка GitHub Actions `verify` прошла на том же SHA; run `39334059300`, длительность 58 секунд.
+- В diff и проверенных сценариях критических или блокирующих ошибок не обнаружено.
+- Review `APPROVED` отправлен аккаунтом `esnstwa` на SHA `9a25e754fd6824e39fa0f7bb0b5f6d0081e85c44`.
+- PR #17 смержен 20 октября 2026 г.; merge commit `2a5d92638ab387de51a61f16ce7e1099973ebeb0`.
+- Замечаний, требующих исправления и повторной проверки, нет.
 
-## Замечания и повторная проверка
+## Примечание к комплекту отчёта
 
-`[если были замечания — указать исправление и повторить протокол; иначе написать «замечаний нет»]`
+`EVIDENCE.md`, `README.md` и DOCX-отчёт фиксируют состояние авторской локальной проверки на **19 октября 2026 г.**, до создания commit и PR. Этот протокол — отдельная запись последующей проверки; исходные материалы с датой 19 октября не переписаны.
+
+В протоколе указан проверяющий GitHub-аккаунт. ФИО и учебная группа в данных GitHub не указаны и не добавлялись по предположению.
