@@ -1,5 +1,6 @@
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,7 +15,16 @@ class Settings(BaseSettings):
     dev_student_email: str = "student@tutorflow.local"
     enable_dev_teacher_fallback: bool = False
     file_storage_path: str = "var/uploads"
-
+    session_lifetime_seconds: int = Field(
+        default=43200,
+        gt=0,
+        description="Lifetime of a regular authentication session in seconds.",
+    )
+    remember_session_lifetime_seconds: int = Field(
+        default=2592000,
+        gt=0,
+        description="Lifetime of a remember-me authentication session in seconds.",
+    )
 
     @property
     def session_cookie_secure(self) -> bool:

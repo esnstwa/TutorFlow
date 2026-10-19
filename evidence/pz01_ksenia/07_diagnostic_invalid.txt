@@ -1,0 +1,7 @@
+invalid_auth_configuration_check:
+INFO component_start
+configuration_error: session_lifetime_seconds: Input should be greater than 0
+INFO component_result status=error
+
+exit_code=2
+secret_leak_check=PASS (diagnostic output contains no sensitive input value)

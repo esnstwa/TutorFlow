@@ -1,0 +1,21 @@
+TutorFlow ПЗ №1 — Р2 / Р4: locked toolchain and wheel build
+==============================================================================
+$ uv lock --check
+Using CPython 3.14.7
+Resolved 47 packages in 1ms
+uv_lock_check_exit=0
+
+$ uv pip check --python D:/TutorFlow/.venv/Scripts/python.exe
+Using Python 3.13.7 environment at: D:\TutorFlow\.venv
+Checked 54 packages in 221ms
+All installed packages are compatible
+uv_pip_check_exit=0
+
+$ uv sync --locked --extra dev
+Created isolated environment: C:/Users/kseni/AppData/Local/hermes/cache/scratch/pz01-dev-env-20261019
+Built tutorflow @ file:///C:/Users/kseni/AppData/Local/hermes/cache/scratch/tutorflow-pz01-auth-config-20261019
+Installed tutorflow==0.1.0 and 46 dependencies
+uv_sync_exit=0
+
+$ python scripts/build_component.py wheel
+BUILD_OK artifact=C:\Users\kseni\AppData\Local\hermes\cache\scratch\pz01-wheel-output-20261019\tutorflow-0.1.0-py3-none-any.whl version=0.1.0 git_sha=3a3f23e2743b-dirty packaged_files=5

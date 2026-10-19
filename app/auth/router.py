@@ -49,7 +49,11 @@ def authenticated_response(request: Request, db: Session, user: User, status_cod
     old_session = resolve_session(request, db)
     if old_session is not None:
         old_session.revoked_at = utc_now()
-    lifetime = 2592000 if remember else 43200
+    lifetime = (
+        settings.remember_session_lifetime_seconds
+        if remember
+        else settings.session_lifetime_seconds
+    )
     raw = secrets.token_urlsafe(32)
     session = AuthSession(user_id=user.id, token_hash=token_digest(raw),
                           csrf_token=secrets.token_urlsafe(32), expires_at=utc_now() + timedelta(seconds=lifetime))
