@@ -1,7 +1,7 @@
 # Тест-кейсы — расписание (Артём)
 
 **Требование:** FR-07 (`docs/mdk03.02/pz01/REQUIREMENTS.md:27`); для сохранения — FR-16 (`:36`).
-**Риск-ориентированный пересмотр:** [RISK_REGISTER_ARTEM.md](RISK_REGISTER_ARTEM.md).
+**Риск-ориентированный пересмотр:** [SCHEDULE_RISK_REGISTER.md](SCHEDULE_RISK_REGISTER.md).
 **Граница:** сервис создания `app/services.py:294–327`; API `app/web/router.py:229–249,252–292,372–381`; проверка сохранённого состояния — новая DB session. `POST /api/mock/lessons/{id}/reschedule` — историческое имя маршрута; он использует SQLAlchemy DB, а не in-memory mock.
 
 **Предусловие каждого кейса:** отдельное чистое тестовое состояние, преподаватель T, активный ученик S (при необходимости T2/S2); дата без seed-занятий. `schedule_case` создаёт отдельный in-memory SQLite engine на каждый тест (`StaticPool`, внешние ключи включены), синтетические записи и TestClient; `get_db` направлен на эту БД, а тестовая dependency выдаёт преподавателя T. Teardown удаляет таблицы и engine. Production service/router/model исполняются реально, без mock бизнес-логики. Часы и внешние сервисы не нужны.
@@ -164,7 +164,7 @@
 
 Уже есть `tests/test_persistence.py:52–68` (CRUD/persistence), `tests/test_teacher_cabinet.py:88–106` (перенос и один конфликт), `:109–142` (изменение и статус/заметка). Новые тесты должны добавить границы, чистое состояние и зафиксированные продуктовые решения, а не дублировать только эти happy paths.
 
-Для шага 7 выполнен один изолированный mutation experiment: удаление фильтра `Student.teacher_id == teacher_id` в `scoped_student`. A-SCH-04 обнаружил дефект на активном чужом ученике. Результаты и ограничения — в [`MUTATION_ARTEM.md`](MUTATION_ARTEM.md), точный patch — в [`mutation_artem.patch`](mutation_artem.patch). Основное рабочее дерево не мутировалось. Предложенная overlap-мутация для A-SCH-08/A-SCH-11 не выполнялась: она остаётся предварительным правилом в [предложении по FR-07](../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md) до согласования.
+Для шага 7 выполнен один изолированный mutation experiment: удаление фильтра `Student.teacher_id == teacher_id` в `scoped_student`. A-SCH-04 обнаружил дефект на активном чужом ученике. Результаты и ограничения — в [`SCHEDULE_MUTATION_EXPERIMENT.md`](SCHEDULE_MUTATION_EXPERIMENT.md), точный patch — в [`schedule_ownership_mutation.patch`](schedule_ownership_mutation.patch). Основное рабочее дерево не мутировалось. Предложенная overlap-мутация для A-SCH-08/A-SCH-11 не выполнялась: она остаётся предварительным правилом в [предложении по FR-07](../pz01/FR07_OVERLAP_CHANGE_PROPOSAL.md) до согласования.
 
 ## Реализация и фактические запуски
 
@@ -179,14 +179,14 @@ python -m pytest tests/test_schedule_pz02.py -q
 python -m pytest tests/test_schedule_pz02.py -q
 31 passed, 0 failed, 0 skipped, 1 warning (2.13s)
 
-python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:coverage-artem.xml --cov-report=json:coverage-artem.json
+python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:coverage-schedule.xml --cov-report=json:coverage-schedule.json
 31 passed, 0 failed, 0 skipped, 1 warning (5.12s)
 
 python -m pytest -q
 217 passed, 0 failed, 0 skipped, 1 warning (12.93s)
 ```
 
-Запуски предыдущего coverage-этапа выполнены 2026-10-12 на Windows 11/Python 3.12.10. Предупреждение — Starlette о deprecated-интеграции `httpx` с `starlette.testclient`; production-код не менялся. Локальный coverage command измеряет только `tests/test_schedule_pz02.py`; это локальный запуск, не CI. Детальные итоги модулей и целевых участков — в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Позже для опубликованного коммита `54bf940b9e428fb4eae92a4488059542451055eb` workflow `verify` завершился успешно ([run #38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377)).
+Запуски предыдущего coverage-этапа выполнены 2026-10-12 на Windows 11/Python 3.12.10. Предупреждение — Starlette о deprecated-интеграции `httpx` с `starlette.testclient`; production-код не менялся. Локальный coverage command измеряет только `tests/test_schedule_pz02.py`; это локальный запуск, не CI. Детальные итоги модулей и целевых участков — в [SCHEDULE_COVERAGE.md](SCHEDULE_COVERAGE.md). Позже для опубликованного коммита `54bf940b9e428fb4eae92a4488059542451055eb` workflow `verify` завершился успешно ([run #38267883377](https://github.com/esnstwa/TutorFlow/actions/runs/38267883377)).
 
 ### Повторная проверка перед устранением замечаний ревью (2026-10-12)
 
@@ -223,8 +223,8 @@ node --test tests/auth-wizard.test.cjs tests/student-lifecycle.test.cjs
 node tests/test_session_fetch.cjs
 6 session fetch checks passed
 
-python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:coverage-artem.xml --cov-report=json:coverage-artem.json
+python -m pytest tests/test_schedule_pz02.py -q --cov=app.services --cov=app.web.router --cov-branch --cov-report=term-missing --cov-report=xml:coverage-schedule.xml --cov-report=json:coverage-schedule.json
 36 passed, 1 warning
 ```
 
-Оба новых Python-прогона и coverage-запуск завершились с exit code 0; предупреждение — одно `StarletteDeprecationWarning` о связке `httpx`/`starlette.testclient`. Текущие показатели и ограничения — в [COVERAGE_ARTEM.md](COVERAGE_ARTEM.md). Для коммита исправлений `8c60b666848cf5cd723796de707f4ddf1d9d6bb3` GitHub Actions run [#38282040226](https://github.com/esnstwa/TutorFlow/actions/runs/38282040226) завершился успешно; job `verify` — `Success`. Артефакт `coverage-artem` содержит проверенные `coverage-artem.xml` и `coverage-artem.json`.
+Оба новых Python-прогона и coverage-запуск завершились с exit code 0; предупреждение — одно `StarletteDeprecationWarning` о связке `httpx`/`starlette.testclient`. Текущие показатели и ограничения — в [SCHEDULE_COVERAGE.md](SCHEDULE_COVERAGE.md). Для коммита исправлений `8c60b666848cf5cd723796de707f4ddf1d9d6bb3` GitHub Actions run [#38282040226](https://github.com/esnstwa/TutorFlow/actions/runs/38282040226) завершился успешно; job `verify` — `Success`. Артефакт `coverage-artem` содержит проверенные `coverage-artem.xml` и `coverage-artem.json`.

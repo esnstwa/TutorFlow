@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from app.auth.schemas import RegisterRequest
 from app.users.models import UserRole
-from tests.data.registration_kseniya import (
+from tests.data.registration_test_data import (
     BASE_REGISTRATION,
     CONFIRMATIONS,
     EMAIL_BOUNDARIES,
