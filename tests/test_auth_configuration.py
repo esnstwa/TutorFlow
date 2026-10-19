@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.auth.models import AuthSession
 from app.auth.sessions import COOKIE_NAME, token_digest
-from app.core.config import Settings, settings
+from app.core.config import MAX_SESSION_LIFETIME_SECONDS, Settings, settings
 from app.main import app
 from tests.conftest import TestingSessionLocal
 
@@ -49,11 +49,38 @@ def _session_for_cookie(raw_cookie: str) -> AuthSession:
         return session
 
 
-def test_session_settings_preserve_previous_default_lifetimes() -> None:
+def test_session_settings_preserve_previous_default_lifetimes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SESSION_LIFETIME_SECONDS", raising=False)
+    monkeypatch.delenv("REMEMBER_SESSION_LIFETIME_SECONDS", raising=False)
+
     configured = Settings(_env_file=None)
 
     assert configured.session_lifetime_seconds == 43200
     assert configured.remember_session_lifetime_seconds == 2592000
+
+
+@pytest.mark.parametrize("field", ["session_lifetime_seconds", "remember_session_lifetime_seconds"])
+def test_session_settings_accept_only_datetime_safe_upper_boundary(field: str) -> None:
+    configured = Settings(_env_file=None, **{field: MAX_SESSION_LIFETIME_SECONDS})
+
+    assert getattr(configured, field) == MAX_SESSION_LIFETIME_SECONDS
+
+    with pytest.raises(ValidationError) as raised:
+        Settings(_env_file=None, **{field: MAX_SESSION_LIFETIME_SECONDS + 1})
+
+    assert field in {str(error["loc"][0]) for error in raised.value.errors()}
+
+
+@pytest.mark.parametrize("field", ["session_lifetime_seconds", "remember_session_lifetime_seconds"])
+def test_101_digit_session_lifetime_is_rejected(field: str) -> None:
+    oversized = int("1" + "0" * 100)
+
+    with pytest.raises(ValidationError) as raised:
+        Settings(_env_file=None, **{field: oversized})
+
+    assert field in {str(error["loc"][0]) for error in raised.value.errors()}
 
 
 def test_session_settings_accept_positive_environment_values(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -124,12 +151,21 @@ def test_auth_routes_use_configured_lifetimes_for_both_session_modes(
     assert "Max-Age=121" in remembered.headers["set-cookie"]
 
 
-def test_runtime_diagnostic_rejects_invalid_session_setting_without_secret_leak() -> None:
+@pytest.mark.parametrize(
+    ("environment_name", "field_name"),
+    [
+        ("SESSION_LIFETIME_SECONDS", "session_lifetime_seconds"),
+        ("REMEMBER_SESSION_LIFETIME_SECONDS", "remember_session_lifetime_seconds"),
+    ],
+)
+def test_runtime_diagnostic_rejects_101_digit_session_setting_without_secret_leak(
+    environment_name: str, field_name: str
+) -> None:
     environment = os.environ.copy()
     environment.update(
         {
             "APP_ENV": "test",
-            "SESSION_LIFETIME_SECONDS": "0",
+            environment_name: "1" + "0" * 100,
             "DATABASE_URL": "diagnostic-secret-marker",
         }
     )
@@ -145,6 +181,6 @@ def test_runtime_diagnostic_rejects_invalid_session_setting_without_secret_leak(
 
     assert result.returncode == 2
     assert "configuration_error" in result.stderr
-    assert "session_lifetime_seconds" in result.stderr
+    assert field_name in result.stderr
     assert "diagnostic-secret-marker" not in result.stdout + result.stderr
     assert "component_result status=error" in result.stderr
