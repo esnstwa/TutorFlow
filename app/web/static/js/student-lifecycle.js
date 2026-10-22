@@ -18,51 +18,121 @@
     }
     return result;
   };
+  // Teacher mutations share one lock; the invitation page below is independent.
+  let teacherPending = null;
+  const lockTeacher = (root) => {
+    teacherPending = root;
+    const controls = Array.from(root.querySelectorAll('button, input, select, textarea')).filter(node => !node.hasAttribute('data-invite-url')).map(node => [node, node.disabled]);
+    controls.forEach(([node]) => { node.disabled = true; });
+    root.setAttribute('aria-busy', 'true');
+    return () => {
+      teacherPending = null;
+      if (!root.isConnected) return;
+      controls.forEach(([node, disabled]) => { node.disabled = disabled; });
+      root.removeAttribute('aria-busy');
+    };
+  };
+  const teacherStudent = (result, root, archived) => {
+    const student = result?.student;
+    if (result?.ok !== true || !student || String(student.id) !== root.dataset.studentId || student.archived !== archived || !['linked', 'invited', 'unlinked'].includes(student.lifecycle) || typeof student.lifecycle_label !== 'string' || !student.lifecycle_label.trim()) {
+      throw new Error('Сервер не подтвердил изменение ученика. Обновите карточку и проверьте данные.');
+    }
+    return student;
+  };
+  document.addEventListener('tutorflow:before-navigate', event => {
+    if (teacherPending) event.preventDefault();
+  });
+  document.addEventListener('cancel', event => {
+    if (teacherPending && event.target.closest('[data-student-lifecycle]')) event.preventDefault();
+  }, true);
+  document.addEventListener('keydown', event => {
+    if (teacherPending && event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
   document.addEventListener('click', async (event) => {
-    const control = event.target.closest('[data-student-edit], [data-student-invite], [data-student-archive], [data-lifecycle-close], [data-copy-invite]');
+    if (teacherPending && event.target.closest('[data-student-lifecycle], [data-open-modal]')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    const control = event.target.closest('[data-student-edit], [data-student-invite], [data-student-archive], [data-student-restore], [data-lifecycle-close], [data-copy-invite]');
     if (!control) return;
     const root = control.closest('[data-student-lifecycle]');
-    if (!root) return;
+    if (!root || !root.isConnected) return;
+    if (root.dataset.archived === 'true' && !control.hasAttribute('data-student-restore') && !control.hasAttribute('data-lifecycle-close')) {
+      showError(root.querySelector('[data-lifecycle-error]'), 'Ученик в архиве. Сначала восстановите карточку.');
+      return;
+    }
+    if (control.hasAttribute('data-student-invite')) {
+      const reason = root.dataset.lifecycle === 'linked' ? 'Аккаунт ученика уже привязан.' : !root.dataset.email?.trim() ? 'Чтобы пригласить ученика, укажите почту в карточке.' : '';
+      if (reason) { showError(root.querySelector('[data-lifecycle-error]'), reason); return; }
+      if (root.dataset.lifecycle === 'invited' && !window.confirm('Перевыпустить приглашение? Предыдущая ссылка станет недействительной. Передайте ученику новую ссылку.')) return;
+    }
+    if (control.disabled) return;
     if (control.hasAttribute('data-lifecycle-close')) { control.closest('dialog').close(); return; }
     if (control.hasAttribute('data-student-edit')) { root.querySelector('[data-student-edit-dialog]').showModal(); return; }
     if (control.hasAttribute('data-student-archive')) { root.querySelector('[data-student-archive-dialog]').showModal(); return; }
     const error = root.querySelector('[data-lifecycle-error]');
     showError(error, '');
-    control.disabled = true;
+    const unlock = lockTeacher(root);
     try {
-      if (control.hasAttribute('data-copy-invite')) {
+      if (control.hasAttribute('data-student-restore')) {
+        const result = await api(`/api/students/${root.dataset.studentId}/restore`, {});
+        if (!root.isConnected) return;
+        teacherStudent(result, root, false);
+        window.location.assign(`/students/${root.dataset.studentId}`);
+      } else if (control.hasAttribute('data-copy-invite')) {
         const input = root.querySelector('[data-invite-url]');
         if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(input.value);
         else { input.focus(); input.select(); showError(error, 'Ссылка выделена. Скопируйте её с помощью Ctrl+C.'); }
       } else {
+        root.querySelector('[data-invite-result]').hidden = true;
+        root.querySelector('[data-invite-url]').value = '';
+        root.querySelector('[data-invite-expiry]').textContent = '';
         const result = await api(`/api/students/${root.dataset.studentId}/invite`, {});
-        const link = new URL(result.invitation.url, window.location.origin);
-        if (link.origin !== window.location.origin || link.pathname !== '/invite') throw new Error('Некорректная ссылка приглашения.');
+        if (!root.isConnected) return;
+        const student = teacherStudent(result, root, false);
+        const invitation = result.invitation;
+        if (student.lifecycle !== 'invited' || typeof invitation?.url !== 'string' || typeof invitation.expires_at !== 'string') throw new Error('Сервер не подтвердил приглашение. Обновите карточку.');
+        const link = new URL(invitation.url, window.location.origin);
+        const expiry = Date.parse(invitation.expires_at);
+        if (link.origin !== window.location.origin || link.pathname !== '/invite' || link.search || link.username || link.password || !/^#[A-Za-z0-9_-]{32,128}$/.test(link.hash) || !Number.isFinite(expiry) || expiry <= Date.now()) throw new Error('Некорректная ссылка или срок приглашения. Обновите карточку.');
         root.querySelector('[data-invite-url]').value = link.href;
         root.querySelector('[data-invite-result]').hidden = false;
-        root.querySelector('[data-invite-expiry]').textContent = `Срок действия: ${new Date(result.invitation.expires_at).toLocaleString('ru-RU')}. Письмо автоматически не отправляется.`;
-        control.textContent = 'Новое приглашение';
+        root.querySelector('[data-invite-expiry]').textContent = `Срок действия: ${new Date(expiry).toLocaleString('ru-RU')}. Письмо автоматически не отправляется.`;
+        root.dataset.lifecycle = student.lifecycle;
+        root.querySelector('[data-student-lifecycle-label]').textContent = student.lifecycle_label;
+        control.textContent = 'Перевыпустить приглашение';
         root.querySelector('[data-invite-url]').focus();
       }
-    } catch (failure) { showError(error, failure.message); }
-    finally { control.disabled = false; }
-  });
+    } catch (failure) {
+      if (root.isConnected) showError(error, failure.message + (control.hasAttribute('data-student-invite') ? ' При повторном приглашении предыдущая ссылка могла быть отменена. Обновите карточку перед повтором.' : ''));
+    }
+    finally { unlock(); }
+  }, true);
   document.addEventListener('submit', async (event) => {
     const form = event.target;
     if (!form.matches('[data-student-edit-form], [data-student-archive-form]')) return;
     event.preventDefault();
+    if (teacherPending) return;
     const root = form.closest('[data-student-lifecycle]');
+    if (!root || !root.isConnected || root.dataset.archived === 'true') return;
     const editing = form.hasAttribute('data-student-edit-form');
     const error = form.querySelector(editing ? '[data-edit-error]' : '[data-archive-error]');
     const button = form.querySelector('[type="submit"]');
     if (button.disabled) return;
-    button.disabled = true;
+    const data = editing ? Object.fromEntries(Array.from(new FormData(form)).filter(([name]) => ['name', 'email', 'subject', 'grade', 'avatar'].includes(name))) : {};
+    const unlock = lockTeacher(root);
     showError(error, '');
     try {
-      const data = editing ? Object.fromEntries(new FormData(form)) : {};
-      await api(`/api/students/${root.dataset.studentId}${editing ? '' : '/archive'}`, data, editing ? 'PATCH' : 'POST');
-      window.location.assign(editing ? `/students/${root.dataset.studentId}` : '/students');
-    } catch (failure) { showError(error, failure.message); button.disabled = false; }
+      const result = await api(`/api/students/${root.dataset.studentId}${editing ? '' : '/archive'}`, data, editing ? 'PATCH' : 'POST');
+      if (!root.isConnected) return;
+      teacherStudent(result, root, !editing);
+      window.location.assign(`/students/${root.dataset.studentId}`);
+    } catch (failure) { if (root.isConnected) showError(error, failure.message); }
+    finally { unlock(); }
   });
   const invitation = document.querySelector('[data-invitation-page]');
   if (!invitation) {

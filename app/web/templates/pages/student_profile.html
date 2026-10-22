@@ -4,22 +4,28 @@
 {% block page_description %}Профиль ученика{% endblock %}
 {% block teacher_content %}
 <div class="dashboard-detail-grid">
-  <section class="dashboard-card dashboard-profile-card" data-student-lifecycle data-student-id="{{ student.id }}">
+  <section class="dashboard-card dashboard-profile-card" data-student-lifecycle data-student-id="{{ student.id }}" data-archived="{{ 'true' if student.archived else 'false' }}" data-lifecycle="{{ student.lifecycle }}" data-email="{{ student.email or '' }}">
     <span class="dashboard-avatar dashboard-avatar--large">{{ student.initials }}</span>
     <h2>{{ student.name }}</h2><p>{{ student.subject }} · {{ student.grade }}</p>
     <dl class="dashboard-details">
       <div><dt>Почта</dt><dd>{{ student.email or 'Не указана' }}</dd></div>
-      <div><dt>Аккаунт</dt><dd><span class="dashboard-status">{{ student.lifecycle_label }}</span></dd></div>
+      <div><dt>Аккаунт</dt><dd><span class="dashboard-status" data-student-lifecycle-label>{{ student.lifecycle_label }}</span></dd></div>
       <div><dt>Статус</dt><dd>{% if student.archived %}В архиве{% else %}Учится{% endif %}</dd></div>
     </dl>
-    {% if not student.archived %}
+    {% if student.archived %}
+    <p role="status">Ученик в архиве: карточка только для чтения. Занятия и задания доступны в истории ниже.</p>
+    <button type="button" class="dashboard-primary" data-student-restore>Восстановить ученика</button>
+    {% else %}
     <div class="dashboard-modal-actions">
       <button type="button" class="dashboard-secondary" data-student-edit>Редактировать</button>
-      {% if student.lifecycle != 'linked' %}<button type="button" class="dashboard-primary" data-student-invite>Пригласить</button>{% endif %}
+      {% if student.lifecycle != 'linked' %}<button type="button" class="dashboard-primary" data-student-invite{% if not student.email %} disabled{% endif %}>{% if student.lifecycle == 'invited' %}Перевыпустить приглашение{% else %}Пригласить{% endif %}</button>{% endif %}
       <button type="button" class="dashboard-secondary" data-student-archive>В архив</button>
     </div>
     {% endif %}
+    {% if not student.archived and student.lifecycle != 'linked' and not student.email %}<p>Чтобы пригласить ученика, укажите почту в карточке.</p>{% endif %}
+    {% if not student.archived and student.lifecycle == 'invited' %}<p>Повторное приглашение отменяет предыдущую ссылку. Письмо автоматически не отправляется.</p>{% endif %}
     <p class="dashboard-form-error" data-lifecycle-error role="alert" hidden></p>
+    {% if not student.archived %}
     <div data-invite-result hidden>
       <p>Передайте ссылку ученику. Он войдет с указанной почтой и подтвердит привязку. Повторное приглашение отменяет предыдущую ссылку.</p>
       <label>Ссылка приглашения<input type="text" readonly data-invite-url aria-label="Ссылка приглашения"></label>
@@ -30,10 +36,10 @@
       <form class="dashboard-modal-card" data-student-edit-form>
         <div class="dashboard-modal-header"><h2 id="student-edit-title">Редактирование ученика</h2><button type="button" class="dashboard-modal-close" data-lifecycle-close aria-label="Закрыть">×</button></div>
         <div class="dashboard-modal-fields">
-          <label>Имя и фамилия<input name="name" value="{{ student.name }}" required maxlength="100"></label>
+          <label>Имя и фамилия<input name="name" value="{{ student.name }}" required maxlength="201"></label>
           <label>Почта<input type="email" name="email" value="{{ student.email or '' }}" maxlength="320"></label>
           <label>Предмет<input name="subject" value="{{ student.subject }}" maxlength="120" required></label>
-          <label>Класс<input name="grade" value="{{ student.grade }}" maxlength="50"></label>
+          <label>Класс<input name="grade" value="{{ student.grade }}" maxlength="50" required></label>
         </div>
         <p class="dashboard-form-error" data-edit-error role="alert" hidden></p>
         <div class="dashboard-modal-actions"><button type="button" class="dashboard-secondary" data-lifecycle-close>Отмена</button><button type="submit" class="dashboard-primary">Сохранить</button></div>
@@ -47,7 +53,11 @@
         <div class="dashboard-modal-actions"><button type="button" class="dashboard-secondary" data-lifecycle-close>Отмена</button><button type="submit" class="dashboard-primary">В архив</button></div>
       </form>
     </dialog>
+    {% endif %}
   </section>
+  <div class="student-profile-history">
   <section class="dashboard-card dashboard-page-card"><h2>Занятия</h2><div class="dashboard-entity-list">{% for item in lessons if item.student_id == student.id %}<article class="dashboard-entity-row"><time class="dashboard-entity-time">{{ item.start }}</time><div class="dashboard-entity-main"><a href="{{ url_for('lesson', lesson_id=item.id) }}" data-spa><strong>{{ item.topic }}</strong></a><span>{{ item.date }}</span></div>{{ icon('chevron') }}</article>{% else %}<div class="dashboard-empty"><p>Занятий пока нет.</p></div>{% endfor %}</div></section>
+  <section class="dashboard-card dashboard-page-card"><h2>Задания</h2><div class="dashboard-entity-list">{% for item in student_assignments %}<article class="dashboard-entity-row"><div class="dashboard-entity-main"><a href="{{ url_for('assignment', assignment_id=item.id) }}" data-spa><strong>{{ item.title }}</strong></a><span>Срок: {{ item.due }}</span></div>{{ icon('chevron') }}</article>{% else %}<div class="dashboard-empty"><p>Заданий пока нет.</p></div>{% endfor %}</div></section>
+  </div>
 </div>
 {% endblock %}

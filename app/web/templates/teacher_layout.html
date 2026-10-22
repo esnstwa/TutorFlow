@@ -2,7 +2,7 @@
 {% from "components/dashboard_icons.html" import icon %}
 
 {% block title %}{% block teacher_title %}Кабинет преподавателя{% endblock %} · TutorFlow{% endblock %}
-{% block styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/schedule.css') }}?v={{ static_version('css/schedule.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/homework.css') }}?v={{ static_version('css/homework.css') }}">{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}?v={{ static_version('css/dashboard.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/schedule.css') }}?v={{ static_version('css/schedule.css') }}"><link rel="stylesheet" href="{{ url_for('static', path='/css/homework.css') }}?v={{ static_version('css/homework.css') }}">{% endblock %}
 
 {% block content %}
 <div class="teacher-dashboard" data-teacher-shell>

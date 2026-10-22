@@ -1,5 +1,20 @@
 body:has(> .teacher-dashboard) { min-width: 0; background: #fff; }
 
+/* Teacher student directory/profile only: preserve readable long names. */
+.teacher-dashboard [data-directory-student] strong,
+.teacher-dashboard [data-student-lifecycle],
+.teacher-dashboard:has([data-student-lifecycle]) .dashboard-page-heading { min-width: 0; overflow-wrap: anywhere; }
+.teacher-dashboard .student-profile-history { min-width: 0; display: grid; align-content: start; gap: 24px; }
+.teacher-dashboard [data-student-lifecycle] [data-invite-url] { width: 100%; margin: 8px 0; }
+.teacher-dashboard [data-student-lifecycle] button:disabled { cursor: not-allowed; opacity: .65; }
+.teacher-dashboard [data-student-lifecycle][aria-busy="true"] button:disabled { cursor: wait; }
+.teacher-dashboard [data-student-lifecycle] > .dashboard-modal-actions { flex-wrap: wrap; }
+.teacher-dashboard [data-student-lifecycle] > .dashboard-modal-actions > button { flex: 1 1 140px; overflow-wrap: normal; }
+@media (max-width: 640px) {
+  .teacher-dashboard [data-student-lifecycle] > .dashboard-modal-actions { display: grid; grid-template-columns: 1fr; }
+  .teacher-dashboard [data-student-lifecycle] > .dashboard-modal-actions > button { width: 100%; }
+}
+
 .student-directory-filters { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .student-directory-filters label { display: grid; gap: 7px; color: var(--dashboard-muted); font-size: 12px; }
 .student-directory-search { flex: 1 1 240px; }

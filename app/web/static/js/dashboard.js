@@ -142,7 +142,7 @@
       return `<label>${label}<select name="${name}" required><option value="">Выберите ученика</option>${options}</select></label>`;
     }
     if (type === "material") return `<label>${label}<select name="${name}" required><option value="PDF">PDF</option><option value="Презентация">Презентация</option><option value="Ссылка">Ссылка</option></select></label>`;
-    return `<label>${label}<input name="${name}" type="${type}" ${name === "end_date" ? "" : "required"}></label>`;
+    return `<label>${label}<input name="${name}" type="${type}" ${name === "end_date" || (activeModalKind === "student" && name === "email") ? "" : "required"}></label>`;
   };
 
   function openModal(kind, prefill = {}) {
@@ -219,7 +219,7 @@
       submit.textContent = "Сохраняем…";
       errorNode.hidden = true;
       try {
-        const endpoint = activeModalKind === "lesson" ? "/api/lessons" : `/api/mock/${activeModalKind}`;
+        const endpoint = activeModalKind === "lesson" ? "/api/lessons" : activeModalKind === "student" ? "/api/students" : `/api/mock/${activeModalKind}`;
         const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || result.detail || "Не удалось сохранить");

@@ -113,7 +113,11 @@ def student_profile(request: Request, student_id: int, db: Session = Depends(get
     item = scoped_student(db, teacher.id, student_id)
     if not item:
         raise HTTPException(status_code=404, detail="Ученик не найден")
-    return render_teacher(request, "pages/student_profile.html", section="students", db=db, teacher=teacher, student=student_dict(item))
+    student_assignments = [
+        homework_dict(homework) for homework in teacher_homeworks(db, teacher.id)
+        if any(recipient.student_id == item.id for recipient in homework.recipients)
+    ]
+    return render_teacher(request, "pages/student_profile.html", section="students", db=db, teacher=teacher, student=student_dict(item), student_assignments=student_assignments)
 
 
 @router.get("/assignments", response_class=HTMLResponse, name="assignments")
@@ -320,20 +324,30 @@ async def update_student(request: Request, student_id: int, db: Session = Depend
     if not item:
         raise HTTPException(status_code=404, detail="Ученик не найден")
     from app.students.schemas import validated_fields
+    from sqlalchemy import update
+    from app.models import utc_now
+    from app.students.models import StudentInvitation
+    if item.archived_at is not None:
+        raise HTTPException(409, "Ученик в архиве. Сначала восстановите карточку.")
     try:
         fields = validated_fields(payload_dict(await request.json()), partial=True)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    if "email" in fields and fields["email"] != item.email:
-        from sqlalchemy import update
-        from app.models import utc_now
-        from app.students.models import StudentInvitation
-        # Lock/update Student before invitation rows, matching archive and invite order.
-        db.execute(update(Student).where(Student.id == item.id).values(email=fields["email"]))
-        db.execute(update(StudentInvitation).where(StudentInvitation.student_id == item.id, StudentInvitation.consumed_at.is_(None), StudentInvitation.revoked_at.is_(None)).values(revoked_at=utc_now()))
+    # Serialize changes with archive/invite, then refresh stale session state.
+    changed = db.execute(update(Student).where(
+        Student.id == item.id, Student.teacher_id == teacher.id, Student.archived_at.is_(None),
+    ).values(updated_at=Student.updated_at).execution_options(synchronize_session=False))
+    if changed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "Ученик в архиве. Сначала восстановите карточку.")
+    db.refresh(item)
+    email_changed = "email" in fields and fields["email"] != item.email
     for field, value in fields.items():
         setattr(item, field, value)
+    if email_changed:
+        db.execute(update(StudentInvitation).where(StudentInvitation.student_id == item.id, StudentInvitation.consumed_at.is_(None), StudentInvitation.revoked_at.is_(None)).values(revoked_at=utc_now()))
     commit_or_422(db)
+    db.refresh(item)
     return {"ok": True, "student": student_dict(item)}
 
 
