@@ -32,7 +32,17 @@ def test_teacher_pages_are_available() -> None:
         assert "dashboard.js" in response.text
 
 
-def test_dashboard_contains_working_navigation() -> None:
+def test_dashboard_contains_working_navigation(monkeypatch) -> None:
+    from datetime import datetime, timezone
+    from app import services
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            value = datetime(2026, 9, 29, 10, tzinfo=timezone.utc)
+            return value.astimezone(tz) if tz is not None else value.replace(tzinfo=None)
+
+    monkeypatch.setattr(services, "datetime", Clock)
     response = client.get("/dashboard")
 
     assert 'href="http://testserver/schedule"' in response.text

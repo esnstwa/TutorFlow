@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
+from math import ceil
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -172,7 +173,7 @@ def teacher_dict(teacher: User) -> dict[str, Any]:
         "first_name": teacher.first_name,
         "last_name": teacher.last_name,
         "initials": initials(teacher.first_name, teacher.last_name),
-        "subject": "Математика",
+        "subject": "",
         "email": teacher.email,
         "avatar": teacher.avatar,
     }
@@ -223,14 +224,30 @@ def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
         selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.student),
         selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.submissions),
         selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.reviews),
-    ).where(Lesson.teacher_id == teacher.id).order_by(Lesson.start_at)))
+    ).where(Lesson.teacher_id == teacher.id).order_by(Lesson.start_at, Lesson.id)))
     assignments = teacher_homeworks(db, teacher.id)
     materials = list(db.scalars(select(FileResource).where(FileResource.owner_id == teacher.id).order_by(FileResource.id)))
     now = datetime.now(timezone.utc)
-    next_lesson = next((item for item in lessons if item.start_at.replace(tzinfo=item.start_at.tzinfo or timezone.utc) >= now and item.status == "scheduled"), lessons[0] if lessons else None)
+    next_lesson = next((item for item in lessons if item.status == "scheduled" and localize(item.end_at) > now), None)
     lesson_rows = [lesson_dict(item, next_id=next_lesson.id if next_lesson else None) for item in lessons]
+    next_row = next((item for item in lesson_rows if item["is_next"]), None)
+    if next_row is not None and next_lesson is not None:
+        start, end = localize(next_lesson.start_at), localize(next_lesson.end_at)
+        seconds = (start - now).total_seconds()
+        if seconds <= 0:
+            countdown = "Идёт занятие"
+        elif seconds < 60:
+            countdown = "Менее минуты"
+        else:
+            days, minutes = divmod(ceil(seconds / 60), 1440)
+            hours, minutes = divmod(minutes, 60)
+            parts = [f"{value} {unit}" for value, unit in ((days, "д"), (hours, "ч"), (minutes, "мин")) if value]
+            countdown = "Через " + " ".join(parts)
+        next_row.update(start_at=start.isoformat(), end_at=end.isoformat(),
+                        date_full=f"{next_row['date']} {start.year}", countdown=countdown,
+                        server_now=now.isoformat())
     assignment_rows = [assignment_dict(item) for item in assignments]
-    today = datetime.now(MOSCOW).date()
+    today = now.astimezone(MOSCOW).date()
     notifications = notification_rows(db, teacher.id)
     return {
         "teacher": teacher_dict(teacher),
@@ -240,9 +257,9 @@ def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
         "assignments": assignment_rows,
         "materials": [file_dict(item) for item in materials],
         "notifications": notifications,
-        "next_lesson": next((item for item in lesson_rows if item["is_next"]), lesson_rows[0] if lesson_rows else None),
+        "next_lesson": next_row,
         "calendar_today": today.isoformat(),
-        "calendar_time": datetime.now(MOSCOW).strftime("%H:%M"),
+        "calendar_time": now.astimezone(MOSCOW).strftime("%H:%M"),
     }
 
 

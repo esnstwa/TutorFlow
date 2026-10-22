@@ -22,14 +22,16 @@
       fields: [["name", "Имя и фамилия", "text"], ["email", "Электронная почта", "email"], ["subject", "Предмет", "text"], ["grade", "Класс", "text"]],
     },
     material: {
-      title: "Загрузить материал",
-      submit: "Добавить материал",
+      title: "Добавить запись о материале (без загрузки файла)",
+      submit: "Добавить запись",
+      success: "Запись о материале добавлена. Файл не загружен.",
       destination: "/materials",
       fields: [["title", "Название", "text"], ["kind", "Тип материала", "material"]],
     },
   };
 
   let activeModalKind = null;
+  let countdownTimer = null;
 
   const shell = () => document.querySelector("[data-teacher-shell]");
   const getStudents = () => {
@@ -45,6 +47,7 @@
   };
 
   async function navigate(url, { replace = false } = {}) {
+    window.clearInterval(countdownTimer);
     setLoading(true);
     try {
       const response = await fetch(url, { headers: { "X-TutorFlow-Navigation": "partial" } });
@@ -66,6 +69,41 @@
     } finally { setLoading(false); }
   }
 
+  function initCountdown() {
+    window.clearInterval(countdownTimer);
+    const node = document.querySelector("[data-lesson-countdown]");
+    if (!node) return;
+    const start = Date.parse(node.dataset.startAt);
+    const end = Date.parse(node.dataset.endAt);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+    if (!Number.isFinite(node.clockOffset)) {
+      const serverNow = Date.parse(node.dataset.serverNow);
+      node.clockOffset = Number.isFinite(serverNow) ? serverNow - Date.now() : 0;
+    }
+    const update = () => {
+      const now = Date.now() + node.clockOffset;
+      if (now >= end) {
+        window.clearInterval(countdownTimer);
+        node.textContent = "Занятие завершено";
+        if (!node.refreshing) {
+          node.refreshing = true;
+          navigate(location.href, { replace: true });
+        }
+        return false;
+      }
+      const remaining = start - now;
+      if (remaining <= 0) node.textContent = "Идёт занятие";
+      else if (remaining < 60000) node.textContent = "Менее минуты";
+      else {
+        const totalMinutes = Math.ceil(remaining / 60000);
+        const parts = [[Math.floor(totalMinutes / 1440), "д"], [Math.floor(totalMinutes % 1440 / 60), "ч"], [totalMinutes % 60, "мин"]];
+        node.textContent = "Через " + parts.filter(([value]) => value).map(([value, unit]) => `${value} ${unit}`).join(" ");
+      }
+      return true;
+    };
+    if (update()) countdownTimer = window.setInterval(update, 1000);
+  }
+
   const closeProfileMenu = () => {
     const menu = document.querySelector(".dashboard-profile-dropdown");
     const trigger = document.querySelector("[data-profile-trigger]");
@@ -73,9 +111,11 @@
     trigger?.setAttribute("aria-expanded", "false");
   };
 
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
+
   const fieldMarkup = ([name, label, type]) => {
     if (type === "student") {
-      const options = getStudents().map((student) => `<option value="${student.id}">${student.name}</option>`).join("");
+      const options = getStudents().map((student) => `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)}</option>`).join("");
       return `<label>${label}<select name="${name}" required><option value="">Выберите ученика</option>${options}</select></label>`;
     }
     if (type === "material") return `<label>${label}<select name="${name}" required><option value="PDF">PDF</option><option value="Презентация">Презентация</option><option value="Ссылка">Ссылка</option></select></label>`;
@@ -156,7 +196,7 @@
         if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить");
         closeModal();
         await navigate(definition.destination);
-        showToast("Готово — данные добавлены");
+        showToast(definition.success || "Готово — данные добавлены");
       } catch (error) {
         errorNode.textContent = error.message;
         errorNode.hidden = false;
@@ -169,8 +209,7 @@
     if (event.target.matches("[data-settings-form]")) {
       event.preventDefault();
       const status = event.target.querySelector(".dashboard-inline-status");
-      status.textContent = "Сохранено";
-      window.setTimeout(() => { if (status.isConnected) status.textContent = ""; }, 2200);
+      status.textContent = "Сохранение настроек пока недоступно. Данные не изменены.";
     }
   });
 
@@ -181,6 +220,9 @@
     }
   });
   document.addEventListener("tutorflow:open-modal", (event) => openModal(event.detail.kind, event.detail.prefill));
+  document.addEventListener("tutorflow:navigated", initCountdown);
   window.addEventListener("popstate", () => navigate(location.href, { replace: true }));
+  window.addEventListener("pageshow", initCountdown);
   window.TutorFlow = { navigate, openModal, showToast };
+  initCountdown();
 })();
