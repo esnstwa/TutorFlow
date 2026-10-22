@@ -88,11 +88,14 @@ def test_schedule_has_interactive_calendar_data() -> None:
     assert 'data-calendar-view="week"' in response.text
     assert 'data-calendar-events' in response.text
     assert 'data-calendar-filter' in response.text
-    assert 'data-google-status="disconnected"' in response.text
+    assert "data-google" not in response.text
+    assert "Google Calendar" not in response.text
     assert "data-lesson-dialog" in response.text
     assert 'value="completed_unpaid"' in response.text
     assert 'maxlength="500"' in response.text
-    assert "Подключение появится после настройки OAuth" in response.text
+    assert "OAuth" not in response.text
+    for name in ("student_id", "date", "start", "end_date", "end", "duration"):
+        assert f'name="{name}"' in response.text
 
 
 def test_lesson_can_be_rescheduled_to_a_free_slot() -> None:

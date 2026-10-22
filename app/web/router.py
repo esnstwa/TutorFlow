@@ -29,16 +29,18 @@ from app.homework.service import (
     teacher_homeworks,
     teacher_recipient,
 )
-from app.integrations.google_calendar import google_calendar
+
 from app.models import Conversation, FileResource, Homework, HomeworkRecipient, HomeworkSubmission, Lesson, Student, User
 from app.services import (
-    LESSON_STATUSES,
     assignment_dict,
     cabinet_data,
     calendar_events,
     create_entity,
     file_dict,
+    ensure_lesson_slot,
     lesson_dict,
+    lesson_material_labels,
+    lesson_values,
     local_datetime,
     material_from_label,
     scoped_assignment,
@@ -90,7 +92,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), teacher: User = D
 
 @router.get("/schedule", response_class=HTMLResponse, name="schedule")
 def schedule(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    return render_teacher(request, "pages/schedule.html", section="schedule", db=db, teacher=teacher, calendar_events=calendar_events(db, teacher), google_calendar=google_calendar.get_state())
+    return render_teacher(request, "pages/schedule.html", section="schedule", db=db, teacher=teacher, calendar_events=calendar_events(db, teacher))
 
 
 @router.get("/students", response_class=HTMLResponse, name="students")
@@ -226,6 +228,7 @@ async def create_compatible_entity(request: Request, kind: str, db: Session = De
     return {"ok": True, "entity": entity}
 
 
+@router.post("/api/lessons/{lesson_id}/reschedule", response_class=JSONResponse)
 @router.post("/api/mock/lessons/{lesson_id}/reschedule", response_class=JSONResponse, name="reschedule_mock_lesson")
 async def reschedule(request: Request, lesson_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     try:
@@ -236,11 +239,9 @@ async def reschedule(request: Request, lesson_id: int, db: Session = Depends(get
         duration = item.end_at - item.start_at
         start_at = local_datetime(str(payload["date"]), str(payload["start"]))
         end_at = start_at + duration
-        collision = db.scalar(select(Lesson.id).where(Lesson.teacher_id == teacher.id, Lesson.id != item.id, Lesson.start_at < end_at, Lesson.end_at > start_at))
-        if collision:
-            raise ValueError("Это время уже занято")
+        ensure_lesson_slot(db, teacher.id, start_at, end_at, exclude_id=item.id)
         item.start_at, item.end_at = start_at, end_at
-        db.commit()
+        commit_or_422(db)
         db.refresh(item)
         result = lesson_dict(scoped_lesson(db, teacher.id, item.id))
     except (KeyError, TypeError, ValueError) as error:
@@ -257,23 +258,13 @@ async def update_compatible_lesson(request: Request, lesson_id: int, db: Session
         item = scoped_lesson(db, teacher.id, lesson_id)
         if not item:
             raise ValueError("Занятие не найдено")
-        status_value = str(payload.get("status", ""))
-        topic = str(payload.get("topic", "")).strip()
-        note = str(payload.get("teacher_note", ""))
-        material_labels = payload.get("materials", [])
-        if status_value not in LESSON_STATUSES:
-            raise ValueError("Неизвестный статус занятия")
-        if not topic:
-            raise ValueError("Укажите тему занятия")
-        if len(note) > 500:
-            raise ValueError("Заметка не должна превышать 500 символов")
-        if not isinstance(material_labels, list):
-            raise ValueError("Некорректный список материалов")
-        item.status, item.topic, item.teacher_note = status_value, topic, note
-        item.location = str(payload.get("location", "")).strip()
-        item.meeting_url = item.location if item.location.startswith(("http://", "https://")) else None
-        item.materials = [material_from_label(db, teacher, str(label).strip()) for label in material_labels if str(label).strip()]
-        db.commit()
+        values = lesson_values(db, teacher, payload, item=item)
+        material_labels = lesson_material_labels(payload)
+        for field, value in values.items():
+            setattr(item, field, value)
+        if "materials" in payload:
+            item.materials = [material_from_label(db, teacher, label) for label in material_labels]
+        commit_or_422(db)
         result = lesson_dict(scoped_lesson(db, teacher.id, lesson_id))
     except (TypeError, ValueError) as error:
         db.rollback()
@@ -371,11 +362,11 @@ def get_lesson_api(lesson_id: int, db: Session = Depends(get_db), teacher: User 
 
 @router.post("/api/lessons")
 async def create_lesson(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    payload = payload_dict(await request.json())
     try:
+        payload = payload_dict(await request.json())
         entity = create_entity(db, teacher, "lesson", payload)
         commit_or_422(db)
-    except (KeyError, ValueError) as error:
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(error)) from error
     return {"ok": True, "lesson": entity}

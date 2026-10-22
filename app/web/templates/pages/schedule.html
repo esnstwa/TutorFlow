@@ -4,7 +4,7 @@
 {% block teacher_header %}
 <div class="dashboard-page-heading schedule-page-heading">
   <h1>Расписание</h1>
-  <p>Ваши занятия, задания и другие события в одном календаре.</p>
+  <p>Занятия и проверка заданий · время Москвы (UTC+3).</p>
 </div>
 <button class="dashboard-primary schedule-create-button" type="button" data-open-modal="lesson">{{ icon('plus') }}Создать занятие</button>
 {% endblock %}
@@ -25,6 +25,7 @@
         <button type="button" data-calendar-view="month" aria-pressed="false">Месяц</button>
       </div>
     </div>
+    <p class="schedule-calendar-status" data-calendar-status role="status">Загрузка расписания…</p>
     <div class="schedule-canvas-wrap">
       <div class="schedule-canvas" data-calendar-canvas aria-live="polite"></div>
     </div>
@@ -41,21 +42,9 @@
       <h2>Мои календари</h2>
       <label><input type="checkbox" value="lessons" data-calendar-filter checked><span class="schedule-check schedule-check--lessons">{{ icon('check') }}</span><span>Занятия TutorFlow</span></label>
       <label><input type="checkbox" value="reviews" data-calendar-filter checked><span class="schedule-check schedule-check--reviews">{{ icon('check') }}</span><span>Проверка заданий</span></label>
-      <label><input type="checkbox" value="personal" data-calendar-filter checked><span class="schedule-check schedule-check--personal">{{ icon('check') }}</span><span>Личные дела</span></label>
-      <label><input type="checkbox" value="google" data-calendar-filter checked><span class="schedule-check schedule-check--google">{{ icon('check') }}</span><span>Google Calendar</span><span class="schedule-google-mark" aria-hidden="true">G</span></label>
     </section>
 
-    <section class="schedule-side-card schedule-google-card" data-google-status="{{ 'connected' if google_calendar.connected else 'disconnected' }}">
-      {% if google_calendar.connected %}
-      <div class="schedule-google-heading"><span class="schedule-google-logo">G</span><div><h2>Google Calendar</h2><span class="schedule-connected">Подключен</span></div></div>
-      <label class="schedule-google-toggle"><span>Показывать события Google Calendar</span><input type="checkbox" {% if google_calendar.events_visible %}checked{% endif %}></label>
-      <button type="button" class="schedule-sync-button" {% if not google_calendar.can_sync %}disabled{% endif %}>{{ icon('sync') }}Синхронизировать</button>
-      {% else %}
-      <div class="schedule-google-heading"><span class="schedule-google-logo">G</span><div><h2>Google Calendar</h2><p>Синхронизируйте внешние события с TutorFlow</p></div></div>
-      <button type="button" class="dashboard-secondary schedule-connect-button" data-google-connect>Подключить</button>
-      <p class="schedule-integration-note" data-google-note hidden>Подключение появится после настройки OAuth.</p>
-      {% endif %}
-    </section>
+
   </aside>
 
   <dialog class="schedule-lesson-dialog" data-lesson-dialog aria-labelledby="lesson-dialog-title">
@@ -92,8 +81,19 @@
 
         <section class="schedule-lesson-section">
           <h3>Информация</h3>
+          <label class="schedule-lesson-field"><span>Ученик</span><select name="student_id" required></select></label>
+          <p class="schedule-field-hint">Смена ученика не меняет получателей уже выданных домашних заданий.</p>
+          <div class="schedule-time-fields">
+            <label class="schedule-lesson-field"><span>Дата начала (Москва)</span><input type="date" name="date" required></label>
+            <label class="schedule-lesson-field"><span>Начало</span><input type="time" name="start" required></label>
+            <label class="schedule-lesson-field"><span>Дата окончания (Москва)</span><input type="date" name="end_date" required></label>
+            <label class="schedule-lesson-field"><span>Окончание</span><input type="time" name="end" required></label>
+            <label class="schedule-lesson-field"><span>Длительность, мин</span><input type="number" name="duration" min="1" step="1" required></label>
+          </div>
+          <label class="schedule-lesson-field"><span>Предмет</span><input type="text" name="subject" maxlength="120" required></label>
           <label class="schedule-lesson-field"><span>Тема занятия</span><input type="text" name="topic" maxlength="200" required></label>
-          <label class="schedule-lesson-field"><span>Место проведения или ссылка</span><input type="text" name="location" maxlength="300" placeholder="Например, Google Meet или адрес"></label>
+          <label class="schedule-lesson-field"><span>Место проведения</span><input type="text" name="location" maxlength="300" placeholder="Онлайн или адрес"></label>
+          <label class="schedule-lesson-field"><span>Ссылка на встречу</span><input type="url" name="meeting_url" maxlength="500" placeholder="https://…"></label>
           <div class="schedule-materials-heading"><span>Материалы занятия</span><button type="button" data-material-add>{{ icon('plus') }}Добавить материал</button></div>
           <div class="schedule-material-list" data-material-list></div>
         </section>

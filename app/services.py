@@ -36,7 +36,10 @@ MONTHS = ("", "января", "февраля", "марта", "апреля", "�
 
 
 def local_datetime(date_value: str, time_value: str) -> datetime:
-    return datetime.combine(date.fromisoformat(date_value), time.fromisoformat(time_value), tzinfo=MOSCOW)
+    clock = time.fromisoformat(time_value)
+    if clock.tzinfo is not None:
+        raise ValueError("Укажите местное время Europe/Moscow без смещения")
+    return datetime.combine(date.fromisoformat(date_value), clock, tzinfo=MOSCOW)
 
 
 def localize(value: datetime) -> datetime:
@@ -132,6 +135,9 @@ def lesson_dict(lesson: Lesson, *, next_id: int | None = None) -> dict[str, Any]
         "topic": lesson.topic,
         "date": date_label(start),
         "date_iso": start.date().isoformat(),
+        "end_date_iso": end.date().isoformat(),
+        "start_at": start.isoformat(),
+        "end_at": end.isoformat(),
         "start": start.strftime("%H:%M"),
         "end": end.strftime("%H:%M"),
         "is_next": lesson.id == next_id,
@@ -288,7 +294,7 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
         selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.reviews),
     ).where(Lesson.teacher_id == teacher.id)
     if date_from:
-        stmt = stmt.where(Lesson.start_at >= datetime.combine(date_from, time.min, tzinfo=MOSCOW))
+        stmt = stmt.where(Lesson.end_at > datetime.combine(date_from, time.min, tzinfo=MOSCOW))
     if date_to:
         stmt = stmt.where(Lesson.start_at < datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=MOSCOW))
     lessons = list(db.scalars(stmt.order_by(Lesson.start_at)))
@@ -297,15 +303,85 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
         row = lesson_dict(lesson)
         events.append({
             "id": f"lesson-{lesson.id}", "entity_id": lesson.id, "type": "lessons",
-            "title": row["student"]["name"], "subtitle": f"{row['student']['subject']} · {row['topic']}",
+            "title": row["student"]["name"], "subtitle": f"{row['subject']} · {row['topic']}",
             "avatar": row["student"]["initials"], "date": row["date_iso"], "start": row["start"], "end": row["end"],
             "url": f"/lessons/{lesson.id}", "draggable": True, "status": lesson.status, "lesson": row,
         })
     submissions = list(db.scalars(select(HomeworkRecipient).join(Homework).where(Homework.teacher_id == teacher.id, HomeworkRecipient.status == "SUBMITTED")))
     for item in submissions:
         submitted = localize(item.submitted_at)
-        events.append({"id": f"review-{item.id}", "type": "reviews", "title": "Проверка задания", "subtitle": "Работа ученика", "date": submitted.date().isoformat(), "start": submitted.strftime("%H:00"), "end": (submitted + timedelta(hours=1)).strftime("%H:00"), "url": f"/homework-recipients/{item.id}", "draggable": False})
+        end = submitted + timedelta(hours=1)
+        events.append({"id": f"review-{item.id}", "type": "reviews", "title": "Проверка задания", "subtitle": "Работа ученика", "date": submitted.date().isoformat(), "start": submitted.strftime("%H:00"), "end_date": end.date().isoformat(), "end": end.strftime("%H:00"), "url": f"/homework-recipients/{item.id}", "draggable": False})
     return events
+
+
+def ensure_lesson_slot(db: Session, teacher_id: int, start_at: datetime, end_at: datetime, *, exclude_id: int | None = None) -> None:
+    if end_at <= start_at:
+        raise ValueError("Окончание занятия должно быть позже начала")
+    statement = select(Lesson.id).where(Lesson.teacher_id == teacher_id, Lesson.start_at < end_at, Lesson.end_at > start_at)
+    if exclude_id is not None:
+        statement = statement.where(Lesson.id != exclude_id)
+    if db.scalar(statement):
+        raise ValueError("Это время уже занято")
+
+
+def lesson_values(db: Session, teacher: User, payload: dict[str, Any], *, item: Lesson | None = None) -> dict[str, Any]:
+    """Validate a complete proposed state before mutating a lesson."""
+    raw_id = payload.get("student_id", item.student_id if item else None)
+    if isinstance(raw_id, bool) or not isinstance(raw_id, (str, int)) or not str(raw_id).isdecimal():
+        raise ValueError("Ученик не найден")
+    if int(raw_id) > 2**63 - 1:
+        raise ValueError("Ученик не найден")
+    student = scoped_student(db, teacher.id, int(raw_id))
+    if student is None or (student.archived_at is not None and (item is None or student.id != item.student_id)):
+        raise ValueError("Ученик не найден")
+
+    def text(field: str, default: str, maximum: int, *, required: bool = False) -> str:
+        value = payload.get(field, default)
+        if not isinstance(value, str):
+            raise ValueError("Поля занятия должны быть строками")
+        value = value.strip() if field != "teacher_note" else value
+        if required and not value:
+            raise ValueError("Укажите тему занятия" if field == "topic" else "Укажите предмет")
+        if len(value) > maximum:
+            raise ValueError("Заметка не должна превышать 500 символов" if field == "teacher_note" else "Поле занятия слишком длинное")
+        return value
+
+    status = payload.get("status", item.status if item else "scheduled")
+    if not isinstance(status, str) or status not in LESSON_STATUSES:
+        raise ValueError("Неизвестный статус занятия")
+    start_date = payload.get("date", localize(item.start_at).date().isoformat() if item else "")
+    start_time = payload.get("start", localize(item.start_at).time().isoformat() if item else "")
+    end_time = payload.get("end", localize(item.end_at).time().isoformat() if item else "")
+    if not all(isinstance(value, str) for value in (start_date, start_time, end_time)):
+        raise ValueError("Некорректная дата или время")
+    start_at = local_datetime(start_date, start_time)
+    day_offset = localize(item.end_at).date() - localize(item.start_at).date() if item else timedelta()
+    end_date = payload.get("end_date", (start_at.date() + day_offset).isoformat())
+    if not isinstance(end_date, str):
+        raise ValueError("Некорректная дата или время")
+    end_at = local_datetime(end_date, end_time)
+    if end_at <= start_at:
+        raise ValueError("Окончание занятия должно быть позже начала")
+    if item is None or start_at != localize(item.start_at) or end_at != localize(item.end_at):
+        ensure_lesson_slot(db, teacher.id, start_at, end_at, exclude_id=item.id if item else None)
+    location = text("location", item.location if item else "", 300)
+    meeting_url = text("meeting_url", item.meeting_url or "" if item else "", 1000) if "meeting_url" in payload else (
+        location if "location" in payload and location.startswith(("http://", "https://")) else item.meeting_url if item and "location" not in payload else None
+    )
+    return {
+        "student_id": student.id, "student": student, "start_at": start_at, "end_at": end_at, "status": status,
+        "subject": text("subject", item.subject if item else student.subject, 120, required=True),
+        "topic": text("topic", item.topic if item else "", 200, required=True), "location": location,
+        "meeting_url": meeting_url or None, "teacher_note": text("teacher_note", item.teacher_note if item else "", 500),
+    }
+
+
+def lesson_material_labels(payload: dict[str, Any]) -> list[str]:
+    labels = payload.get("materials", [])
+    if not isinstance(labels, list) or any(not isinstance(label, str) or len(label) > 200 for label in labels):
+        raise ValueError("Некорректный список материалов")
+    return [label.strip() for label in labels if label.strip()]
 
 
 def create_entity(db: Session, teacher: User, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -316,31 +392,12 @@ def create_entity(db: Session, teacher: User, kind: str, payload: dict[str, Any]
         db.flush()
         return student_dict(item)
     if kind == "lesson":
-        student = scoped_student(db, teacher.id, int(payload["student_id"]))
-        if not student or student.archived_at is not None:
-            raise ValueError("Ученик не найден")
-        start_at = local_datetime(str(payload["date"]), str(payload["start"]))
-        end_at = local_datetime(str(payload["date"]), str(payload["end"]))
-        if end_at <= start_at:
-            raise ValueError("Окончание занятия должно быть позже начала")
-        collision = db.scalar(select(Lesson.id).where(Lesson.teacher_id == teacher.id, Lesson.start_at < end_at, Lesson.end_at > start_at))
-        if collision:
-            raise ValueError("Это время уже занято")
-        status = str(payload.get("status", "scheduled"))
-        if status not in LESSON_STATUSES:
-            raise ValueError("Неизвестный статус занятия")
-        topic = str(payload.get("topic") or "").strip()
-        if not topic:
-            raise ValueError("Укажите тему занятия")
-        teacher_note = str(payload.get("teacher_note", ""))
-        if len(teacher_note) > 500:
-            raise ValueError("Заметка не должна превышать 500 символов")
-        location = str(payload.get("location", "Онлайн · TutorFlow")).strip()
-        meeting_url = str(payload.get("meeting_url", "")).strip() or None
-        item = Lesson(teacher_id=teacher.id, student_id=student.id, subject=str(payload.get("subject") or student.subject), topic=topic, start_at=start_at, end_at=end_at, location=location, meeting_url=meeting_url, teacher_note=teacher_note, status=status)
+        values = lesson_values(db, teacher, payload)
+        labels = lesson_material_labels(payload)
+        item = Lesson(teacher_id=teacher.id, **values)
         db.add(item)
+        item.materials = [material_from_label(db, teacher, label) for label in labels]
         db.flush()
-        item.student = student
         return lesson_dict(item)
     if kind == "assignment":
         due = datetime.combine(date.fromisoformat(str(payload["due"])), time(23, 59), tzinfo=MOSCOW)
