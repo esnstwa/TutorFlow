@@ -326,12 +326,13 @@ function modal() {
   return {nodes, showModal() {}, querySelector: selector => nodes.get(selector)};
 }
 
-test('metadata-only material action says that it creates a record, not an upload', () => {
+test('obsolete metadata-only modal cannot masquerade as material upload', () => {
   const dialog = modal();
   const runtime = page({modal: dialog});
   runtime.window.TutorFlow.openModal('material');
-  assert.match(dialog.nodes.get('[data-modal-title]').textContent, /запись/);
-  assert.doesNotMatch(dialog.nodes.get('[data-modal-title]').textContent, /Загрузить/);
+  assert.equal(dialog.nodes.get('[data-modal-title]').textContent, '');
+  assert.equal(dialog.nodes.get('[data-modal-fields]').innerHTML, '');
+  assert.equal(runtime.requests.length, 0);
 });
 
 test('student names are escaped rather than interpreted as option markup', () => {

@@ -1,5 +1,6 @@
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,7 @@ class Settings(BaseSettings):
     dev_student_email: str = "student@tutorflow.local"
     enable_dev_teacher_fallback: bool = False
     file_storage_path: str = "var/uploads"
+    file_upload_max_bytes: int = Field(default=20 * 1024 * 1024, gt=0, le=20 * 1024 * 1024)
 
 
     @property

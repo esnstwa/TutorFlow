@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.core.auth import get_current_student, get_current_teacher, get_current_user, optional_current_user
 from app.core.database import get_db
@@ -30,6 +31,8 @@ from app.homework.service import (
     teacher_recipient,
 )
 
+from app.materials import (accessible_file, delete_stored_material, download_response, file_metadata,
+                           persist_upload, upload_headers, upload_targets)
 from app.models import Conversation, FileResource, Homework, HomeworkRecipient, HomeworkSubmission, Lesson, Student, User
 from app.services import (
     assignment_dict,
@@ -51,7 +54,7 @@ from app.services import (
     student_directory,
     submission_dict,
 )
-from app.storage import finish_staged_deletion, restore_staged_file, stage_deletion, store_bytes
+from app.storage import FileStorageError, finish_staged_deletion, restore_staged_file, stage_deletion, store_bytes, store_stream
 from app.web.navigation import TEACHER_NAVIGATION, get_auth_navigation
 from app.web.templating import templates
 
@@ -529,10 +532,27 @@ async def submit_student_homework_api(request: Request, recipient_id: int, db: S
     return {"ok": True, "recipient": recipient_dict(updated, include_history=True)}
 
 
+@router.get("/api/files/{file_id}")
+def get_file_metadata(file_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return JSONResponse({"ok": True, "file": file_metadata(accessible_file(db, user, file_id))},
+                        headers={"Cache-Control": "private, no-store", "Vary": "Cookie"})
+
+
+@router.get("/api/files/{file_id}/download")
+def download_material(file_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return download_response(accessible_file(db, user, file_id))
+
+
+@router.get("/api/files/{file_id}/preview")
+def preview_material(file_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return download_response(accessible_file(db, user, file_id), preview=True)
+
+
 @router.get("/api/materials")
 def list_materials(db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     rows = db.scalars(select(FileResource).where(FileResource.owner_id == teacher.id).order_by(FileResource.id))
-    return {"ok": True, "materials": [file_dict(item) for item in rows]}
+    return JSONResponse({"ok": True, "materials": [file_dict(item) for item in rows]},
+                        headers={"Cache-Control": "private, no-store", "Vary": "Cookie"})
 
 
 @router.get("/api/materials/{material_id}")
@@ -540,39 +560,34 @@ def get_material_api(material_id: int, db: Session = Depends(get_db), teacher: U
     item = db.scalar(select(FileResource).where(FileResource.id == material_id, FileResource.owner_id == teacher.id))
     if not item:
         raise HTTPException(status_code=404, detail="Материал не найден")
-    return {"ok": True, "material": file_dict(item)}
+    return JSONResponse({"ok": True, "material": file_dict(item)},
+                        headers={"Cache-Control": "private, no-store", "Vary": "Cookie"})
 
 
 @router.post("/api/materials")
 async def create_material(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     payload = payload_dict(await request.json())
-    item = FileResource(owner_id=teacher.id, original_name=str(payload.get("original_name") or payload.get("title") or "material"), stored_name=payload.get("stored_name"), storage_path=payload.get("path"), mime_type=payload.get("mime_type"), size=int(payload.get("size", 0)), title=str(payload.get("title") or payload.get("original_name") or "Материал"), kind=str(payload.get("kind") or payload.get("type") or "Файл"), description=str(payload.get("description", "")), url=payload.get("url"))
+    if any(payload.get(field) for field in ("path", "storage_path", "stored_name")) or payload.get("size", 0) not in (0, "0", None):
+        raise HTTPException(status_code=422, detail="Содержимое файла передаётся только через /api/files/upload")
+    item = FileResource(owner_id=teacher.id, original_name=str(payload.get("original_name") or payload.get("title") or "material"), mime_type=payload.get("mime_type"), size=0, title=str(payload.get("title") or payload.get("original_name") or "Материал"), kind=str(payload.get("kind") or payload.get("type") or "Файл"), description=str(payload.get("description", "")), url=payload.get("url"))
     db.add(item)
     commit_or_422(db)
     return {"ok": True, "material": file_dict(item)}
 
 
 @router.post("/api/files/upload")
-async def upload_file(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    original_name = unquote(request.headers.get("X-Filename", "").strip())
-    if not original_name:
-        raise HTTPException(status_code=422, detail="Передайте имя файла в X-Filename")
-    content = await request.body()
-    if not content:
-        raise HTTPException(status_code=422, detail="Файл пуст")
-    stored_name = storage_path = None
+async def upload_file(request: Request, lesson_id: int | None = Query(None, gt=0),
+                      homework_id: int | None = Query(None, gt=0),
+                      db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    original_name, title, kind, expected_size = upload_headers(request)
+    await run_in_threadpool(upload_targets, db, teacher.id, lesson_id, homework_id)
     try:
-        stored_name, storage_path = store_bytes(original_name, content)
-        item = FileResource(owner_id=teacher.id, original_name=original_name, stored_name=stored_name, storage_path=storage_path, mime_type=request.headers.get("Content-Type"), size=len(content), title=request.headers.get("X-Title", original_name), kind=request.headers.get("X-File-Kind", "Файл"))
-        db.add(item)
-        commit_or_422(db)
-        return {"ok": True, "file": file_dict(item)}
-    except Exception:
-        db.rollback()
-        if storage_path:
-            staged = stage_deletion(storage_path)
-            finish_staged_deletion(staged)
-        raise
+        upload = await store_stream(original_name, request.stream(), declared_mime=request.headers.get("Content-Type"))
+    except FileStorageError as error:
+        raise HTTPException(status_code=503 if error.status_code >= 500 else error.status_code, detail=error.detail) from None
+    item = await run_in_threadpool(persist_upload, db, teacher.id, upload, title=title, kind=kind,
+                                   lesson_id=lesson_id, homework_id=homework_id, expected_size=expected_size)
+    return {"ok": True, "file": await run_in_threadpool(file_dict, item)}
 
 
 @router.post("/api/student/files/upload")
@@ -627,16 +642,8 @@ def delete_material(material_id: int, db: Session = Depends(get_db), teacher: Us
     item = db.scalar(select(FileResource).where(FileResource.id == material_id, FileResource.owner_id == teacher.id))
     if not item:
         raise HTTPException(status_code=404, detail="Материал не найден")
-    staged = stage_deletion(item.storage_path)
-    try:
-        db.delete(item)
-        db.commit()
-    except Exception:
-        db.rollback()
-        restore_staged_file(staged)
-        raise
-    finish_staged_deletion(staged)
-    return {"ok": True}
+    cleanup_pending = delete_stored_material(db, item)
+    return {"ok": True, "cleanup_pending": cleanup_pending}
 
 
 def attachment_owner(db: Session, teacher: User, resource: str, resource_id: int):

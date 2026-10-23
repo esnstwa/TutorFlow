@@ -22,13 +22,6 @@
       destination: "/students",
       fields: [["name", "Имя и фамилия", "text"], ["email", "Электронная почта", "email"], ["subject", "Предмет", "text"], ["grade", "Класс", "text"]],
     },
-    material: {
-      title: "Добавить запись о материале (без загрузки файла)",
-      submit: "Добавить запись",
-      success: "Запись о материале добавлена. Файл не загружен.",
-      destination: "/materials",
-      fields: [["title", "Название", "text"], ["kind", "Тип материала", "material"]],
-    },
   };
 
   let activeModalKind = null;
@@ -141,7 +134,6 @@
       const options = getStudents().map((student) => `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)}</option>`).join("");
       return `<label>${label}<select name="${name}" required><option value="">Выберите ученика</option>${options}</select></label>`;
     }
-    if (type === "material") return `<label>${label}<select name="${name}" required><option value="PDF">PDF</option><option value="Презентация">Презентация</option><option value="Ссылка">Ссылка</option></select></label>`;
     return `<label>${label}<input name="${name}" type="${type}" ${name === "end_date" || (activeModalKind === "student" && name === "email") ? "" : "required"}></label>`;
   };
 

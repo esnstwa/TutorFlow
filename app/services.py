@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
+from app.materials import file_metadata
 from app.homework.schemas import HomeworkCreate
 from app.homework.service import (
     homework_dict,
@@ -107,7 +109,20 @@ def student_directory(db: Session, teacher: User, query: str = "", subject: str 
 
 
 def file_dict(item: FileResource) -> dict[str, Any]:
+    lessons = [
+        {"id": lesson.id, "topic": lesson.topic, "date": date_label(lesson.start_at),
+         "student_name": student_dict(lesson.student)["name"], "url": f"/lessons/{lesson.id}"}
+        for lesson in item.lessons if lesson.teacher_id == item.owner_id
+    ]
+    homeworks = [
+        {"id": homework.id, "title": homework.title, "url": f"/assignments/{homework.id}"}
+        for homework in item.homeworks if homework.teacher_id == item.owner_id
+    ]
     return {
+        **file_metadata(item),
+        "lessons": lessons,
+        "homeworks": homeworks,
+        "availability": "shared" if lessons or any(homework.recipients for homework in item.homeworks if homework.teacher_id == item.owner_id) else "private",
         "id": item.id,
         "title": item.title,
         "kind": item.kind,
@@ -262,6 +277,9 @@ def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
         "today_lessons": [item for item in lesson_rows if item["date_iso"] == today.isoformat()],
         "assignments": assignment_rows,
         "materials": [file_dict(item) for item in materials],
+        "material_lessons": [{"id": item["id"], "title": f'{item["date"]} {item["start"]} · {item["student"]["name"]} · {item["topic"]}'} for item in lesson_rows],
+        "material_homeworks": [{"id": item["id"], "title": item["title"]} for item in assignment_rows],
+        "material_upload_max_bytes": settings.file_upload_max_bytes,
         "notifications": notifications,
         "next_lesson": next_row,
         "calendar_today": today.isoformat(),

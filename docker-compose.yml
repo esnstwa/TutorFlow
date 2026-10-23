@@ -8,6 +8,10 @@ services:
       APP_NAME: TutorFlow
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-tutorflow}:${POSTGRES_PASSWORD:-tutorflow}@db:5432/${POSTGRES_DB:-tutorflow}
+      FILE_STORAGE_PATH: /app/var/uploads
+      FILE_UPLOAD_MAX_BYTES: ${FILE_UPLOAD_MAX_BYTES:-20971520}
+    volumes:
+      - material_data:/app/var/uploads
     ports:
       - "${TUTORFLOW_BIND_HOST:-127.0.0.1}:8000:8000"
     depends_on:
@@ -30,3 +34,4 @@ services:
 
 volumes:
   postgres_data:
+  material_data:
