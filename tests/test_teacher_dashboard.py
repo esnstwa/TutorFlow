@@ -18,6 +18,8 @@ NOW = datetime(2035, 1, 12, 13, 0, tzinfo=MOSCOW)
 
 @pytest.fixture
 def dashboard(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "app_env", "test")
     class Clock(datetime):
         @classmethod
         def now(cls, tz=None):

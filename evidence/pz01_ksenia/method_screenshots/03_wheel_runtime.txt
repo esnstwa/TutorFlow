@@ -1,0 +1,10 @@
+TutorFlow ПЗ №1 — Р5: installed wheel outside source checkout
+==============================================================================
+$ python scripts/verify_wheel_runtime.py
+Wheel installed into a temporary site-packages directory inside a foreign Git repository.
+The application was started from the installed package, not from the source checkout.
+
+WHEEL_RUNTIME PASS git_sha=3a3f23e2743b-dirty foreign_git_sha=7a5819f52a1b health=200 static=200 css_bytes=23418 import=installed-wheel
+WHEEL_CONTENT PASS files=107 required=5 excluded_count=0
+required_present=app/build-info.json,app/core/runtime_diagnostics.py,app/main.py,app/web/static/css/schedule.css,app/web/templates/pages/schedule.html
+excluded=none

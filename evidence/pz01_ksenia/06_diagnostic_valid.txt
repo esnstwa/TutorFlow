@@ -1,0 +1,10 @@
+safe_config_values_from_environment:
+session_lifetime_seconds=60
+remember_session_lifetime_seconds=120
+
+runtime_diagnostics:
+INFO component_start
+INFO component_result status=ok version=0.1.0 git_sha=3a3f23e2743b-dirty
+{"app_name": "TutorFlow", "environment": "development", "git_sha": "3a3f23e2743b-dirty", "status": "ok", "version": "0.1.0"}
+
+exit_code=0

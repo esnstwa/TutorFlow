@@ -511,6 +511,7 @@ def test_delete_database_failure_restores_content_and_returns_safe_error(files_c
 @pytest.fixture
 def file_delete_case(tmp_path, monkeypatch):
     """Real independent connections, unlike schedule_case's single StaticPool."""
+    monkeypatch.setattr(settings, "app_env", "test")
     from contextlib import ExitStack
     from fastapi import FastAPI
     from fastapi.testclient import TestClient

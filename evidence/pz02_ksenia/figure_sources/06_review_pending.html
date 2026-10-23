@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Рисунок 6 — взаимная проверка</title><style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f6f8; color: #17212b; font-family: Consolas, 'Courier New', monospace; }
+.page { width: 1500px; min-height: 900px; margin: 0 auto; padding: 28px 34px; background: white; }
+h1 { font: 700 28px Arial, sans-serif; color: #173b63; margin: 0 0 18px; }
+h2 { font: 700 18px Arial, sans-serif; color: #285b8f; margin: 18px 0 8px; }
+.meta { font: 14px Arial, sans-serif; color: #4b5965; margin-bottom: 18px; }
+pre { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.35; margin: 0; padding: 16px; border: 1px solid #c8d4df; border-radius: 6px; background: #f8fafc; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { border: 1px solid #c8d4df; border-radius: 6px; padding: 14px; background: #fbfdff; }
+.badge { display: inline-block; padding: 4px 8px; border-radius: 12px; background: #d9f2df; color: #176b2b; font: 700 13px Arial, sans-serif; }
+.pending { background: #fff1c7; color: #7b5600; }
+table { width: 100%; border-collapse: collapse; font: 14px Arial, sans-serif; }
+th, td { border: 1px solid #b9c7d3; padding: 9px; text-align: left; vertical-align: top; }
+th { background: #e8f0f7; color: #173b63; }
+.flow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 24px 0; }
+.node { border: 2px solid #3d6f9f; border-radius: 8px; padding: 14px; min-width: 250px; text-align: center; font: 700 15px Arial, sans-serif; background: #eef6ff; }
+.arrow { font: 700 28px Arial, sans-serif; color: #3d6f9f; }
+.small { font: 12px Arial, sans-serif; color: #5e6b76; }
+</style></head><body><main class='page'>
+<h1>Рисунок 6 — состояние взаимной проверки</h1>
+<div class='meta'><span class='badge pending'>R7 pending</span> честное доказательство отсутствия выполненной независимой проверки</div>
+<pre># Протокол независимой проверки ПЗ №2 (шаблон Р7)
+
+Статус: **не выполнено**. Этот файл не является доказательством проверки до заполнения другим студентом.
+
+- Проверяющий: `[заполняет другой студент]`
+- Проект проверяющего: `[указать]`
+- Дата: `[указать]`
+- Зафиксированный commit: `[указать полный SHA после commit]`
+- Репозиторий/ветка: `esnstwa/TutorFlow`, `feature/0104-pz02-ksenia`
+
+## Команды
+
+```text
+[ ] git fetch origin --prune
+[ ] git checkout &lt;фиксированный SHA&gt;
+[ ] uv sync --locked --extra dev
+[ ] uv run --locked --no-sync python -m pytest tests/test_auth_module_contract.py tests/test_auth_sessions.py -q
+[ ] uv run --locked --no-sync python -m compileall -q app tests
+```
+
+## Проверяемые случаи
+
+- [ ] штатная пара для `Argon2PasswordVerifier`;
+- [ ] граничный пустой пароль;
+- [ ] ошибочный пароль;
+- [ ] пустой/искажённый хэш;
+- [ ] один и тот же `/api/auth/login` с production-реализацией и `FixedPasswordVerifier`;
+- [ ] потребитель не изменяется при подмене;
+- [ ] модульная карта соответствует фактическим импортам.
+
+## Фактический результат
+
+`[заполняется проверяющим: команды, exit codes, количество тестов, замечания]`
+
+## Замечания и повторная проверка
+
+`[если были замечания — указать исправление и повторить протокол; иначе написать «замечаний нет»]`
+</pre>
+</main></body></html>

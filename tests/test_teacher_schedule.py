@@ -26,6 +26,8 @@ NOW = datetime(2035, 1, 12, 13, tzinfo=ZoneInfo("Europe/Moscow"))
 
 @pytest.fixture
 def schedule_case(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "app_env", "test")
     class Clock(datetime):
         @classmethod
         def now(cls, tz=None):

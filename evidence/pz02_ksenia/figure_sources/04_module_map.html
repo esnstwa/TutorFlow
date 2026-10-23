@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Рисунок 4 — модульная карта</title><style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f6f8; color: #17212b; font-family: Consolas, 'Courier New', monospace; }
+.page { width: 1500px; min-height: 900px; margin: 0 auto; padding: 28px 34px; background: white; }
+h1 { font: 700 28px Arial, sans-serif; color: #173b63; margin: 0 0 18px; }
+h2 { font: 700 18px Arial, sans-serif; color: #285b8f; margin: 18px 0 8px; }
+.meta { font: 14px Arial, sans-serif; color: #4b5965; margin-bottom: 18px; }
+pre { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.35; margin: 0; padding: 16px; border: 1px solid #c8d4df; border-radius: 6px; background: #f8fafc; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { border: 1px solid #c8d4df; border-radius: 6px; padding: 14px; background: #fbfdff; }
+.badge { display: inline-block; padding: 4px 8px; border-radius: 12px; background: #d9f2df; color: #176b2b; font: 700 13px Arial, sans-serif; }
+.pending { background: #fff1c7; color: #7b5600; }
+table { width: 100%; border-collapse: collapse; font: 14px Arial, sans-serif; }
+th, td { border: 1px solid #b9c7d3; padding: 9px; text-align: left; vertical-align: top; }
+th { background: #e8f0f7; color: #173b63; }
+.flow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 24px 0; }
+.node { border: 2px solid #3d6f9f; border-radius: 8px; padding: 14px; min-width: 250px; text-align: center; font: 700 15px Arial, sans-serif; background: #eef6ff; }
+.arrow { font: 700 28px Arial, sans-serif; color: #3d6f9f; }
+.small { font: 12px Arial, sans-serif; color: #5e6b76; }
+</style></head><body><main class='page'>
+<h1>Рисунок 4 — модульная карта продукта</h1>
+<div class='meta'><span class='badge'>status: работает</span> docs/architecture.md · dependencies are source-code dependencies</div>
+<div class='flow'><div class='node'>app.auth.router<br><span class='small'>consumer: login</span></div><div class='arrow'>→</div><div class='node'>app.auth.passwords<br><span class='small'>PasswordVerifier contract</span></div><div class='arrow'>→</div><div class='node'>argon2-cffi<br><span class='small'>production implementation</span></div></div>
+<div class='flow'><div class='node'>FastAPI point of assembly<br><span class='small'>get_password_verifier</span></div><div class='arrow'>→</div><div class='node'>Argon2PasswordVerifier</div><div class='arrow'>or</div><div class='node'>FixedPasswordVerifier<br><span class='small'>test-only</span></div></div>
+<pre>### Фактическая карта модулей для ПЗ №2
+
+Карта ниже фиксирует зависимости исходного кода, а не только направление вызова. Статус `работает` означает, что путь подключён к приложению и проверен тестом; статус `план` оставлен только для ещё не реализованных продуктовых модулей.
+
+| Модуль | Ответственность и контракт | Фактические зависимости | Статус | Автор записи |
+|---|---|---|---|---|
+| `app.auth.router` | HTTP-сценарии регистрации, входа, выхода и `/api/auth/me`; `login` получает `PasswordVerifier` через `get_password_verifier` | `auth.passwords`, `auth.schemas`, `auth.sessions`, `core.auth`, `core.database`, `models`, `users.service` | работает | Ксения Иванова |
+| `app.auth.passwords` | Контракт `PasswordVerifier.verify(password, password_hash) -&gt; bool`; `Argon2PasswordVerifier` скрывает Argon2 и возвращает `False` для mismatch/пустого ввода/невалидного хэша | `argon2-cffi` | работает | Ксения Иванова |
+| `app.users.service` | Создание пользователя: нормализация email, проверка уникальности, хэширование пароля и сохранение `User` | `core.security`, `users.models`, `users.schemas`, SQLAlchemy | работает | общий модуль проекта |
+| `app.core.auth` | Получение текущего пользователя/роли из серверской сессии и проверка CSRF | `auth.sessions`, `core.database`, `models`, `auth.csrf` | работает | общий модуль проекта |
+| `app.core.security` | Совместимый фасад хэширования; `verify_password` делегирует контракту `PasswordVerifier` | `auth.passwords`, `argon2-cffi` | работает | Ксения Иванова |
+| `tests.support.passwords` | Тестовая подмена `FixedPasswordVerifier` для воспроизведения результата контракта без Argon2 | `PasswordVerifier` по структурному контракту, pytest | работает (test-only) | Ксения Иванова |
+
+Зависимости для выбранного участка: `app.auth.router → app.auth.passwords`; `app.core.security → app.auth.passwords`; `app.users.service → app.core.security`; точка сборки FastAPI получает production-реализацию через `get_password_verifier`, а тесты могут заменить только эту зависимость. Потребитель `login` не импортирует Argon2 и не меняется при выборе `FixedPasswordVerifier`.
+
+</pre>
+</main></body></html>

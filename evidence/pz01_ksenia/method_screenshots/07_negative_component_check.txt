@@ -1,0 +1,7 @@
+TutorFlow ПЗ №1 — Р7: real negative result of automatic verification
+==============================================================================
+$ python scripts/check_component.py --expected-sha 000000000000
+component_check ERROR: SHA не совпал; ожидался 000000000000, получен 3a3f23e2743b
+
+EXIT=1
+This is an intentional negative run: the checker refuses a mismatched expected revision instead of reporting a false pass.
