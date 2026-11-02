@@ -31,10 +31,17 @@ def test_multi_recipient_homework_search_and_lesson_link() -> None:
 
 
 def test_file_only_homework_and_derived_overdue(tmp_path, monkeypatch) -> None:
+    from io import BytesIO
+    from pypdf import PdfWriter
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "file_storage_path", str(tmp_path / "uploads"))
-    uploaded = client.post("/api/files/upload", content=b"task", headers={"X-Filename": "task.pdf", "Content-Type": "application/pdf"})
+    content = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=120, height=160)
+    writer.write(content)
+    uploaded = client.post("/api/files/upload", content=content.getvalue(), headers={"X-Filename": "task.pdf", "Content-Type": "application/pdf"})
+    assert uploaded.status_code == 200, uploaded.text
     file_id = uploaded.json()["file"]["id"]
     due = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
     response = client.post("/api/homework", json={"title": "Файл без описания", "recipient_ids": [1], "attachment_ids": [file_id], "due_at": due})

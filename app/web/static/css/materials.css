@@ -1,0 +1,38 @@
+.materials-page { min-width: 0; }
+.materials-page [hidden] { display: none !important; }
+.materials-page .materials-intro, .materials-page .materials-hint { margin: 0 0 18px; color: var(--dashboard-muted); font-size: 12px; line-height: 1.65; }
+.materials-page .materials-status { margin: 0 0 18px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.materials-page .materials-status:empty { display: none; }
+.materials-page .materials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; }
+.materials-page .materials-card { display: flex; flex-direction: column; min-width: 0; padding: 20px; border: 1px solid var(--dashboard-border); border-radius: 14px; background: #fff; }
+.materials-page .materials-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
+.materials-page .materials-file-icon { padding: 9px; border-radius: 10px; background: var(--dashboard-soft-blue); color: var(--color-primary); font-size: 12px; font-weight: 600; }
+.materials-page .materials-access { padding: 5px 8px; border-radius: 8px; background: #f3f4f7; color: #667085; font-size: 10px; line-height: 1.5; }
+.materials-page .materials-access.is-shared { background: #eaf6ee; color: #286744; }
+.materials-page .materials-card h3 { margin: 0 0 10px; font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; }
+.materials-page .materials-meta, .materials-page .materials-filename, .materials-page .materials-description, .materials-page .materials-file-warning { margin: 0 0 10px; color: var(--dashboard-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.materials-page .materials-file-warning { color: #915c29; }
+.materials-page .materials-relations { display: grid; gap: 8px; margin: 8px 0 18px; }
+.materials-page .materials-relations a { color: var(--color-primary); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.materials-page .materials-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 8px; }
+.materials-page .materials-actions a, .materials-page .materials-actions button { flex: 1 1 90px; white-space: nowrap; }
+.materials-page .materials-delete { min-height: 42px; padding: 10px 12px; border: 1px solid #eedada; border-radius: 9px; background: #fff; color: #a13b3b; font: inherit; font-size: 12px; cursor: pointer; }
+.materials-page button:disabled { opacity: .65; cursor: wait; }
+.materials-page .materials-fields { display: grid; gap: 12px; min-width: 0; }
+.materials-page .materials-fields label { display: grid; gap: 7px; min-width: 0; font-size: 12px; }
+.materials-page .materials-fields label span { color: var(--dashboard-muted); }
+.materials-page .materials-fields input, .materials-page .materials-fields select { width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid var(--dashboard-border); border-radius: 9px; background: #fff; color: inherit; font: inherit; font-size: 13px; }
+.materials-page .materials-fields input[type="file"] { padding: 8px; font-size: 12px; }
+.materials-page .materials-selected { margin: 0 0 4px; color: var(--dashboard-muted); font-size: 12px; overflow-wrap: anywhere; }
+.materials-page .materials-fields .materials-hint { margin: -5px 0 2px; }
+.materials-page :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.materials-page .dashboard-modal-close { flex-shrink: 0; }
+.materials-page .dashboard-form-error { line-height: 1.65; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .materials-page .dashboard-section-toolbar { align-items: stretch; flex-direction: column; gap: 14px; }
+  .materials-page .materials-grid { grid-template-columns: minmax(0, 1fr); }
+  .materials-page .materials-card { padding: 16px; }
+  .materials-page .dashboard-modal-card { padding: 18px; }
+  .materials-page .dashboard-modal-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .materials-page .dashboard-modal-actions button { width: 100%; min-width: 0; white-space: normal; }
+}

@@ -29,8 +29,10 @@ class SQLAlchemyCalendarEventSource:
     adapter does not depend on the legacy application service module.
     """
 
-    def __init__(self, session: Session, lesson_serializer: LessonSerializer) -> None:
+    def __init__(self, session: Session, lesson_serializer: LessonSerializer, *, include_overlapping_lessons: bool = False) -> None:
+        """Default to start-date bounds; teacher HTTP opts into interval overlap."""
         self._session = session
+        self._include_overlapping_lessons = include_overlapping_lessons
         self._lesson_serializer = lesson_serializer
 
     def lessons_for_teacher(
@@ -56,8 +58,9 @@ class SQLAlchemyCalendarEventSource:
         ).where(Lesson.teacher_id == teacher_id)
         if date_from is not None:
             statement = statement.where(
-                Lesson.start_at
-                >= datetime.combine(date_from, time.min, tzinfo=MOSCOW)
+                (Lesson.end_at > datetime.combine(date_from, time.min, tzinfo=MOSCOW))
+                if self._include_overlapping_lessons
+                else (Lesson.start_at >= datetime.combine(date_from, time.min, tzinfo=MOSCOW))
             )
         if date_to is not None:
             statement = statement.where(

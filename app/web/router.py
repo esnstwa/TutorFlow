@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.core.auth import get_current_student, get_current_teacher, get_current_user, optional_current_user
 from app.core.database import get_db
@@ -29,16 +30,20 @@ from app.homework.service import (
     teacher_homeworks,
     teacher_recipient,
 )
-from app.integrations.google_calendar import google_calendar
+
+from app.materials import (accessible_file, delete_stored_material, download_response, file_metadata,
+                           persist_upload, upload_headers, upload_targets)
 from app.models import Conversation, FileResource, Homework, HomeworkRecipient, HomeworkSubmission, Lesson, Student, User
 from app.services import (
-    LESSON_STATUSES,
     assignment_dict,
     cabinet_data,
     calendar_events,
     create_entity,
     file_dict,
+    ensure_lesson_slot,
     lesson_dict,
+    lesson_material_labels,
+    lesson_values,
     local_datetime,
     material_from_label,
     scoped_assignment,
@@ -49,7 +54,7 @@ from app.services import (
     student_directory,
     submission_dict,
 )
-from app.storage import finish_staged_deletion, restore_staged_file, stage_deletion, store_bytes
+from app.storage import FileStorageError, finish_staged_deletion, restore_staged_file, stage_deletion, store_bytes, store_stream
 from app.web.navigation import TEACHER_NAVIGATION, get_auth_navigation
 from app.web.templating import templates
 
@@ -90,7 +95,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), teacher: User = D
 
 @router.get("/schedule", response_class=HTMLResponse, name="schedule")
 def schedule(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    return render_teacher(request, "pages/schedule.html", section="schedule", db=db, teacher=teacher, calendar_events=calendar_events(db, teacher), google_calendar=google_calendar.get_state())
+    return render_teacher(request, "pages/schedule.html", section="schedule", db=db, teacher=teacher, calendar_events=calendar_events(db, teacher))
 
 
 @router.get("/students", response_class=HTMLResponse, name="students")
@@ -111,7 +116,11 @@ def student_profile(request: Request, student_id: int, db: Session = Depends(get
     item = scoped_student(db, teacher.id, student_id)
     if not item:
         raise HTTPException(status_code=404, detail="Ученик не найден")
-    return render_teacher(request, "pages/student_profile.html", section="students", db=db, teacher=teacher, student=student_dict(item))
+    student_assignments = [
+        homework_dict(homework) for homework in teacher_homeworks(db, teacher.id)
+        if any(recipient.student_id == item.id for recipient in homework.recipients)
+    ]
+    return render_teacher(request, "pages/student_profile.html", section="students", db=db, teacher=teacher, student=student_dict(item), student_assignments=student_assignments)
 
 
 @router.get("/assignments", response_class=HTMLResponse, name="assignments")
@@ -226,6 +235,7 @@ async def create_compatible_entity(request: Request, kind: str, db: Session = De
     return {"ok": True, "entity": entity}
 
 
+@router.post("/api/lessons/{lesson_id}/reschedule", response_class=JSONResponse)
 @router.post("/api/mock/lessons/{lesson_id}/reschedule", response_class=JSONResponse, name="reschedule_mock_lesson")
 async def reschedule(request: Request, lesson_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     try:
@@ -236,11 +246,9 @@ async def reschedule(request: Request, lesson_id: int, db: Session = Depends(get
         duration = item.end_at - item.start_at
         start_at = local_datetime(str(payload["date"]), str(payload["start"]))
         end_at = start_at + duration
-        collision = db.scalar(select(Lesson.id).where(Lesson.teacher_id == teacher.id, Lesson.id != item.id, Lesson.start_at < end_at, Lesson.end_at > start_at))
-        if collision:
-            raise ValueError("Это время уже занято")
+        ensure_lesson_slot(db, teacher.id, start_at, end_at, exclude_id=item.id)
         item.start_at, item.end_at = start_at, end_at
-        db.commit()
+        commit_or_422(db)
         db.refresh(item)
         result = lesson_dict(scoped_lesson(db, teacher.id, item.id))
     except (KeyError, TypeError, ValueError) as error:
@@ -257,23 +265,13 @@ async def update_compatible_lesson(request: Request, lesson_id: int, db: Session
         item = scoped_lesson(db, teacher.id, lesson_id)
         if not item:
             raise ValueError("Занятие не найдено")
-        status_value = str(payload.get("status", ""))
-        topic = str(payload.get("topic", "")).strip()
-        note = str(payload.get("teacher_note", ""))
-        material_labels = payload.get("materials", [])
-        if status_value not in LESSON_STATUSES:
-            raise ValueError("Неизвестный статус занятия")
-        if not topic:
-            raise ValueError("Укажите тему занятия")
-        if len(note) > 500:
-            raise ValueError("Заметка не должна превышать 500 символов")
-        if not isinstance(material_labels, list):
-            raise ValueError("Некорректный список материалов")
-        item.status, item.topic, item.teacher_note = status_value, topic, note
-        item.location = str(payload.get("location", "")).strip()
-        item.meeting_url = item.location if item.location.startswith(("http://", "https://")) else None
-        item.materials = [material_from_label(db, teacher, str(label).strip()) for label in material_labels if str(label).strip()]
-        db.commit()
+        values = lesson_values(db, teacher, payload, item=item)
+        material_labels = lesson_material_labels(payload)
+        for field, value in values.items():
+            setattr(item, field, value)
+        if "materials" in payload:
+            item.materials = [material_from_label(db, teacher, label) for label in material_labels]
+        commit_or_422(db)
         result = lesson_dict(scoped_lesson(db, teacher.id, lesson_id))
     except (TypeError, ValueError) as error:
         db.rollback()
@@ -329,20 +327,30 @@ async def update_student(request: Request, student_id: int, db: Session = Depend
     if not item:
         raise HTTPException(status_code=404, detail="Ученик не найден")
     from app.students.schemas import validated_fields
+    from sqlalchemy import update
+    from app.models import utc_now
+    from app.students.models import StudentInvitation
+    if item.archived_at is not None:
+        raise HTTPException(409, "Ученик в архиве. Сначала восстановите карточку.")
     try:
         fields = validated_fields(payload_dict(await request.json()), partial=True)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    if "email" in fields and fields["email"] != item.email:
-        from sqlalchemy import update
-        from app.models import utc_now
-        from app.students.models import StudentInvitation
-        # Lock/update Student before invitation rows, matching archive and invite order.
-        db.execute(update(Student).where(Student.id == item.id).values(email=fields["email"]))
-        db.execute(update(StudentInvitation).where(StudentInvitation.student_id == item.id, StudentInvitation.consumed_at.is_(None), StudentInvitation.revoked_at.is_(None)).values(revoked_at=utc_now()))
+    # Serialize changes with archive/invite, then refresh stale session state.
+    changed = db.execute(update(Student).where(
+        Student.id == item.id, Student.teacher_id == teacher.id, Student.archived_at.is_(None),
+    ).values(updated_at=Student.updated_at).execution_options(synchronize_session=False))
+    if changed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "Ученик в архиве. Сначала восстановите карточку.")
+    db.refresh(item)
+    email_changed = "email" in fields and fields["email"] != item.email
     for field, value in fields.items():
         setattr(item, field, value)
+    if email_changed:
+        db.execute(update(StudentInvitation).where(StudentInvitation.student_id == item.id, StudentInvitation.consumed_at.is_(None), StudentInvitation.revoked_at.is_(None)).values(revoked_at=utc_now()))
     commit_or_422(db)
+    db.refresh(item)
     return {"ok": True, "student": student_dict(item)}
 
 
@@ -371,11 +379,11 @@ def get_lesson_api(lesson_id: int, db: Session = Depends(get_db), teacher: User 
 
 @router.post("/api/lessons")
 async def create_lesson(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    payload = payload_dict(await request.json())
     try:
+        payload = payload_dict(await request.json())
         entity = create_entity(db, teacher, "lesson", payload)
         commit_or_422(db)
-    except (KeyError, ValueError) as error:
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(error)) from error
     return {"ok": True, "lesson": entity}
@@ -524,10 +532,27 @@ async def submit_student_homework_api(request: Request, recipient_id: int, db: S
     return {"ok": True, "recipient": recipient_dict(updated, include_history=True)}
 
 
+@router.get("/api/files/{file_id}")
+def get_file_metadata(file_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return JSONResponse({"ok": True, "file": file_metadata(accessible_file(db, user, file_id))},
+                        headers={"Cache-Control": "private, no-store", "Vary": "Cookie"})
+
+
+@router.get("/api/files/{file_id}/download")
+def download_material(file_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return download_response(accessible_file(db, user, file_id))
+
+
+@router.get("/api/files/{file_id}/preview")
+def preview_material(file_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return download_response(accessible_file(db, user, file_id), preview=True)
+
+
 @router.get("/api/materials")
 def list_materials(db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     rows = db.scalars(select(FileResource).where(FileResource.owner_id == teacher.id).order_by(FileResource.id))
-    return {"ok": True, "materials": [file_dict(item) for item in rows]}
+    return JSONResponse({"ok": True, "materials": [file_dict(item) for item in rows]},
+                        headers={"Cache-Control": "private, no-store", "Vary": "Cookie"})
 
 
 @router.get("/api/materials/{material_id}")
@@ -535,39 +560,34 @@ def get_material_api(material_id: int, db: Session = Depends(get_db), teacher: U
     item = db.scalar(select(FileResource).where(FileResource.id == material_id, FileResource.owner_id == teacher.id))
     if not item:
         raise HTTPException(status_code=404, detail="Материал не найден")
-    return {"ok": True, "material": file_dict(item)}
+    return JSONResponse({"ok": True, "material": file_dict(item)},
+                        headers={"Cache-Control": "private, no-store", "Vary": "Cookie"})
 
 
 @router.post("/api/materials")
 async def create_material(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     payload = payload_dict(await request.json())
-    item = FileResource(owner_id=teacher.id, original_name=str(payload.get("original_name") or payload.get("title") or "material"), stored_name=payload.get("stored_name"), storage_path=payload.get("path"), mime_type=payload.get("mime_type"), size=int(payload.get("size", 0)), title=str(payload.get("title") or payload.get("original_name") or "Материал"), kind=str(payload.get("kind") or payload.get("type") or "Файл"), description=str(payload.get("description", "")), url=payload.get("url"))
+    if any(payload.get(field) for field in ("path", "storage_path", "stored_name")) or payload.get("size", 0) not in (0, "0", None):
+        raise HTTPException(status_code=422, detail="Содержимое файла передаётся только через /api/files/upload")
+    item = FileResource(owner_id=teacher.id, original_name=str(payload.get("original_name") or payload.get("title") or "material"), mime_type=payload.get("mime_type"), size=0, title=str(payload.get("title") or payload.get("original_name") or "Материал"), kind=str(payload.get("kind") or payload.get("type") or "Файл"), description=str(payload.get("description", "")), url=payload.get("url"))
     db.add(item)
     commit_or_422(db)
     return {"ok": True, "material": file_dict(item)}
 
 
 @router.post("/api/files/upload")
-async def upload_file(request: Request, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
-    original_name = unquote(request.headers.get("X-Filename", "").strip())
-    if not original_name:
-        raise HTTPException(status_code=422, detail="Передайте имя файла в X-Filename")
-    content = await request.body()
-    if not content:
-        raise HTTPException(status_code=422, detail="Файл пуст")
-    stored_name = storage_path = None
+async def upload_file(request: Request, lesson_id: int | None = Query(None, gt=0),
+                      homework_id: int | None = Query(None, gt=0),
+                      db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    original_name, title, kind, expected_size = upload_headers(request)
+    await run_in_threadpool(upload_targets, db, teacher.id, lesson_id, homework_id)
     try:
-        stored_name, storage_path = store_bytes(original_name, content)
-        item = FileResource(owner_id=teacher.id, original_name=original_name, stored_name=stored_name, storage_path=storage_path, mime_type=request.headers.get("Content-Type"), size=len(content), title=request.headers.get("X-Title", original_name), kind=request.headers.get("X-File-Kind", "Файл"))
-        db.add(item)
-        commit_or_422(db)
-        return {"ok": True, "file": file_dict(item)}
-    except Exception:
-        db.rollback()
-        if storage_path:
-            staged = stage_deletion(storage_path)
-            finish_staged_deletion(staged)
-        raise
+        upload = await store_stream(original_name, request.stream(), declared_mime=request.headers.get("Content-Type"))
+    except FileStorageError as error:
+        raise HTTPException(status_code=503 if error.status_code >= 500 else error.status_code, detail=error.detail) from None
+    item = await run_in_threadpool(persist_upload, db, teacher.id, upload, title=title, kind=kind,
+                                   lesson_id=lesson_id, homework_id=homework_id, expected_size=expected_size)
+    return {"ok": True, "file": await run_in_threadpool(file_dict, item)}
 
 
 @router.post("/api/student/files/upload")
@@ -622,16 +642,8 @@ def delete_material(material_id: int, db: Session = Depends(get_db), teacher: Us
     item = db.scalar(select(FileResource).where(FileResource.id == material_id, FileResource.owner_id == teacher.id))
     if not item:
         raise HTTPException(status_code=404, detail="Материал не найден")
-    staged = stage_deletion(item.storage_path)
-    try:
-        db.delete(item)
-        db.commit()
-    except Exception:
-        db.rollback()
-        restore_staged_file(staged)
-        raise
-    finish_staged_deletion(staged)
-    return {"ok": True}
+    cleanup_pending = delete_stored_material(db, item)
+    return {"ok": True, "cleanup_pending": cleanup_pending}
 
 
 def attachment_owner(db: Session, teacher: User, resource: str, resource_id: int):

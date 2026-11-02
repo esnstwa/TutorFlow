@@ -1,3 +1,53 @@
 {% extends "teacher_layout.html" %}
-{% block teacher_title %}Материалы{% endblock %}{% block page_heading %}Материалы{% endblock %}{% block page_description %}Учебные файлы и пособия.{% endblock %}
-{% block teacher_content %}<section class="dashboard-card dashboard-page-card"><div class="dashboard-section-toolbar"><h2>Все материалы</h2><button class="dashboard-primary" data-open-modal="material">{{ icon('upload') }}Загрузить материал</button></div>{% if materials %}<div class="dashboard-card-grid">{% for item in materials %}<article class="dashboard-material-card"><span class="dashboard-attention-icon dashboard-attention-icon--blue">{{ icon('book') }}</span><div><strong>{{ item.title }}</strong><small>{{ item.kind }} · {{ item.updated }}</small></div></article>{% endfor %}</div>{% else %}<div class="dashboard-empty"><h3>Материалов пока нет</h3><p>Загрузите первый учебный материал.</p></div>{% endif %}</section>{% endblock %}
+{% block teacher_title %}Материалы{% endblock %}
+{% block page_heading %}Материалы{% endblock %}
+{% block page_description %}Учебные файлы, пособия и материалы к занятиям.{% endblock %}
+{% block teacher_content %}
+<section class="materials-page dashboard-card dashboard-page-card" data-materials-root data-upload-max-bytes="{{ material_upload_max_bytes|default(20971520) }}">
+  <div class="dashboard-section-toolbar"><h2>Все материалы</h2><button class="dashboard-primary" type="button" data-materials-open>{{ icon('upload') }}Загрузить материал</button></div>
+  <p class="materials-intro">Без привязки файл виден только вам. Выберите занятие или задание при загрузке, чтобы открыть доступ связанным ученикам.</p>
+  <p class="materials-status" data-materials-status role="status" aria-live="polite"></p>
+  <div class="materials-grid" data-materials-list>
+    {% for item in materials %}
+    {% set available = item.has_file|default(false) and not item.missing_file|default(false) %}
+    <article class="materials-card" data-material-id="{{ item.id }}">
+      <div class="materials-card-top"><span class="materials-file-icon" aria-hidden="true">{% if item.mime_type == 'application/pdf' %}PDF{% elif available %}Файл{% else %}Запись{% endif %}</span><span class="materials-access{% if item.availability == 'shared' %} is-shared{% endif %}">{% if item.availability == 'shared' %}Доступен ученикам{% else %}Только вам{% endif %}</span></div>
+      <h3>{{ item.title or item.original_name or 'Материал' }}</h3>
+      <p class="materials-meta">{{ item.kind or 'Материал' }} · {{ item.mime_type or 'Без файла' }} · {{ item.size|default(0) }} байт</p>
+      {% if available %}<p class="materials-filename">{{ item.original_name }}</p>{% elif item.missing_file|default(false) %}<p class="materials-file-warning">Файл недоступен — содержимое отсутствует в хранилище</p>{% else %}<p class="materials-file-warning">Запись/ссылка — файл не загружен</p>{% endif %}
+      {% if item.description %}<p class="materials-description">{{ item.description }}</p>{% endif %}
+      <div class="materials-relations">
+        {% for lesson in item.lessons|default([]) %}<a href="/lessons/{{ lesson.id }}" data-spa>{{ lesson.topic or 'Занятие' }}{% if lesson.date %} · {{ lesson.date }}{% endif %}{% if lesson.student_name %} · {{ lesson.student_name }}{% endif %}</a>{% endfor %}
+        {% for homework in item.homeworks|default([]) %}<a href="/assignments/{{ homework.id }}" data-spa>{{ homework.title or 'Задание' }}</a>{% endfor %}
+      </div>
+      <div class="materials-actions">
+        {% if available and item.download_url == '/api/files/' ~ item.id ~ '/download' %}<a class="dashboard-secondary" href="/api/files/{{ item.id }}/download" download>Скачать</a>{% endif %}
+        {% if available and item.previewable and item.mime_type in ['image/png', 'image/jpeg', 'text/plain'] and item.preview_url == '/api/files/' ~ item.id ~ '/preview' %}<a class="dashboard-secondary" href="/api/files/{{ item.id }}/preview" target="_blank" rel="noopener noreferrer">Просмотр</a>{% endif %}
+        <button class="materials-delete" type="button" data-materials-delete="{{ item.id }}" aria-label="Удалить {{ item.title }}">Удалить</button>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="dashboard-empty" data-materials-empty {% if materials %}hidden{% endif %}><h3>Материалов пока нет</h3><p>Загрузите первый PDF, изображение или текстовый файл.</p></div>
+  <noscript><p>Для загрузки и удаления файлов включите JavaScript. Сохранённые материалы можно скачать по ссылкам выше.</p></noscript>
+  <dialog class="dashboard-modal" data-materials-dialog aria-labelledby="materials-upload-title" aria-describedby="materials-upload-hint">
+    <form class="dashboard-modal-card" data-materials-form>
+      <div class="dashboard-modal-header"><div><span class="dashboard-modal-kicker">Учебные материалы</span><h2 id="materials-upload-title">Загрузить файл</h2></div><button class="dashboard-modal-close" type="button" data-materials-close aria-label="Закрыть">{{ icon('close') }}</button></div>
+      <p class="materials-hint" id="materials-upload-hint">PDF, PNG, JPEG или TXT (UTF-8). До {{ material_upload_max_bytes|default(20971520) }} байт. Формат и доступ проверяет сервер.</p>
+      <div class="materials-fields">
+        <label>Файл<input type="file" accept=".pdf,.png,.jpg,.jpeg,.txt" data-materials-file required aria-describedby="materials-upload-hint materials-selected"></label>
+        <p class="materials-selected" id="materials-selected" data-materials-selected>Файл не выбран</p>
+        <label>Название <span>(необязательно)</span><input name="title" type="text" maxlength="200" placeholder="По умолчанию — имя файла"></label>
+        <label>Тип материала <span>(необязательно)</span><input name="kind" type="text" maxlength="80" placeholder="Например, пособие или упражнения"></label>
+        <label>Занятие<select name="lesson_id" aria-describedby="materials-lesson-audience"><option value="">Не привязывать</option>{% for lesson in material_lessons|default([]) %}<option value="{{ lesson.id }}">{{ lesson.title }}</option>{% endfor %}</select></label>
+        <p class="materials-hint" id="materials-lesson-audience">Откроет доступ ученикам выбранного занятия.</p>
+        <label>Задание<select name="homework_id" aria-describedby="materials-homework-audience"><option value="">Не привязывать</option>{% for homework in material_homeworks|default([]) %}<option value="{{ homework.id }}">{{ homework.title }}</option>{% endfor %}</select></label>
+        <p class="materials-hint" id="materials-homework-audience">Откроет доступ получателям выбранного задания.</p>
+      </div>
+      <p class="dashboard-form-error" data-materials-error role="alert" hidden></p>
+      <div class="dashboard-modal-actions"><button type="button" class="dashboard-secondary" data-materials-close>Отмена</button><button type="submit" class="dashboard-primary" data-materials-submit>Загрузить файл</button></div>
+    </form>
+  </dialog>
+  <script type="application/json" data-materials-data>{{ materials|tojson }}</script>
+</section>
+{% endblock %}

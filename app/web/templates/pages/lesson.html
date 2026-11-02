@@ -1,3 +1,21 @@
 {% extends "teacher_layout.html" %}
-{% block teacher_title %}{{ lesson.topic }}{% endblock %}{% block page_heading %}{{ lesson.topic }}{% endblock %}{% block page_description %}Страница занятия{% endblock %}
-{% block teacher_content %}<section class="dashboard-card dashboard-detail-card"><div class="dashboard-detail-hero"><span class="dashboard-attention-icon dashboard-attention-icon--blue">{{ icon('calendar') }}</span><div><h2>{{ lesson.topic }}</h2><a href="{{ url_for('student_profile', student_id=lesson.student.id) }}" data-spa>{{ lesson.student.name }}</a></div>{% if lesson.is_next %}<span class="dashboard-status">Ближайшее</span>{% endif %}</div><dl class="dashboard-details"><div><dt>Дата</dt><dd>{{ lesson.date }}</dd></div><div><dt>Время</dt><dd>{{ lesson.start }}–{{ lesson.end }}</dd></div><div><dt>Предмет</dt><dd>{{ lesson.student.subject }} · {{ lesson.student.grade }}</dd></div></dl></section>{% endblock %}
+{% block teacher_title %}{{ lesson.topic }}{% endblock %}
+{% block page_heading %}{{ lesson.topic }}{% endblock %}
+{% block page_description %}Страница занятия · время Москвы (UTC+3){% endblock %}
+{% block teacher_content %}
+<section class="dashboard-card dashboard-detail-card">
+  <div class="dashboard-detail-hero">
+    <span class="dashboard-attention-icon dashboard-attention-icon--blue">{{ icon('calendar') }}</span>
+    <div><h2>{{ lesson.topic }}</h2><a href="{{ url_for('student_profile', student_id=lesson.student.id) }}" data-spa>{{ lesson.student.name }}</a></div>
+    {% if lesson.is_next %}<span class="dashboard-status">Ближайшее</span>{% endif %}
+  </div>
+  <dl class="dashboard-details">
+    <div><dt>Начало (Москва)</dt><dd>{{ lesson.date_iso }} · {{ lesson.start }}</dd></div>
+    <div><dt>Окончание (Москва)</dt><dd>{{ lesson.end_date_iso }} · {{ lesson.end }}</dd></div>
+    <div><dt>Предмет</dt><dd>{{ lesson.subject }}</dd></div>
+    <div><dt>Статус</dt><dd>{{ {'scheduled': 'Запланировано', 'completed_unpaid': 'Проведено и неоплачено', 'completed_paid': 'Проведено и оплачено', 'cancelled': 'Отменено'}[lesson.status] }}</dd></div>
+    {% if lesson.location %}<div><dt>Место</dt><dd>{{ lesson.location }}</dd></div>{% endif %}
+  </dl>
+  <a class="dashboard-primary" href="{{ url_for('schedule') }}?lesson={{ lesson.id }}" data-spa>Редактировать занятие</a>
+</section>
+{% endblock %}

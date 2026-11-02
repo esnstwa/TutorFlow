@@ -2,27 +2,27 @@
 
 {% block teacher_title %}Главная — кабинет преподавателя{% endblock %}
 {% block teacher_header %}
-<div class="dashboard-greeting"><h1>Добрый день, <em>{{ teacher.name }}!</em></h1><p>Сегодня у вас {{ today_lessons|length }} занятия. Всё под контролем!</p></div>
+<div class="dashboard-greeting"><h1>Добрый день, <em>{{ teacher.name }}!</em></h1><p>Занятий сегодня: {{ today_lessons|length }}.</p></div>
 {% endblock %}
 
 {% block teacher_content %}
 <div class="dashboard-grid">
   <section class="dashboard-card dashboard-next" aria-labelledby="next-title">
-    <div class="dashboard-card-heading"><h2 id="next-title">Следующее занятие</h2><span class="dashboard-countdown">{{ icon('clock') }}Через 1 ч 20 мин</span></div>
+    <div class="dashboard-card-heading"><h2 id="next-title">Ближайшее занятие</h2>{% if next_lesson %}<span class="dashboard-countdown">{{ icon('clock') }}<span data-lesson-countdown data-start-at="{{ next_lesson.start_at }}" data-end-at="{{ next_lesson.end_at }}" data-server-now="{{ next_lesson.server_now }}">{{ next_lesson.countdown }}</span></span>{% endif %}</div>
     {% if next_lesson %}
     <div class="dashboard-lesson-body">
       <div class="dashboard-lesson-details">
         <a class="dashboard-student dashboard-inline-link" href="{{ url_for('student_profile', student_id=next_lesson.student.id) }}" data-spa>
           <span class="dashboard-avatar dashboard-avatar--student" aria-hidden="true">{{ next_lesson.student.initials }}</span>
-          <span><strong>{{ next_lesson.student.name }}</strong><small>{{ next_lesson.student.subject }} · {{ next_lesson.student.grade }}</small></span>
+          <span><strong>{{ next_lesson.student.name }}</strong><small>{{ next_lesson.subject }} · {{ next_lesson.student.grade }}</small></span>
         </a>
         <div class="dashboard-topic"><span>Тема занятия</span><h3>{{ next_lesson.topic }}</h3></div>
-        <p class="dashboard-lesson-time">{{ icon('calendar') }}Сегодня, {{ next_lesson.date }}<span class="dashboard-time-divider">·</span><span>{{ next_lesson.start }}–{{ next_lesson.end }}</span></p>
+        <p class="dashboard-lesson-time">{{ icon('calendar') }}<time datetime="{{ next_lesson.start_at }}">{{ next_lesson.date_full }}</time><span class="dashboard-time-divider">·</span><span>{{ next_lesson.start }}–{{ next_lesson.end }}</span></p>
         <a class="dashboard-primary" href="{{ url_for('lesson', lesson_id=next_lesson.id) }}" data-spa>Перейти к занятию{{ icon('arrow') }}</a>
       </div>
       <div class="dashboard-mascot"><img src="{{ url_for('static', path='/images/augustin/augustin-focused.webp') }}" alt="Синий Августин — преподаватель TutorFlow в очках" width="1254" height="1254" fetchpriority="high"></div>
     </div>
-    {% else %}<div class="dashboard-empty"><h3>Занятий пока нет</h3><p>Создайте занятие через быстрые действия.</p></div>{% endif %}
+    {% else %}<div class="dashboard-empty"><h3>Ближайших занятий нет</h3><p>Создайте занятие через быстрые действия.</p></div>{% endif %}
   </section>
 
   <section class="dashboard-card dashboard-schedule" aria-labelledby="schedule-title">
@@ -32,7 +32,7 @@
       <li{% if lesson_item.is_next %} class="is-next" aria-current="true"{% endif %}>
         <a class="dashboard-timeline-time" href="{{ url_for('lesson', lesson_id=lesson_item.id) }}" data-spa><time>{{ lesson_item.start }}</time><span>{{ lesson_item.end }}</span></a>
         <div class="dashboard-timeline-dot"></div>
-        <div class="dashboard-timeline-lesson"><a href="{{ url_for('student_profile', student_id=lesson_item.student.id) }}" data-spa><h3>{{ lesson_item.student.name }}</h3></a><a href="{{ url_for('lesson', lesson_id=lesson_item.id) }}" data-spa><p>{{ lesson_item.student.subject }} · {{ lesson_item.student.grade }}</p>{% if lesson_item.is_next %}<span class="dashboard-next-label">Ближайшее</span>{% endif %}</a></div>
+        <div class="dashboard-timeline-lesson"><a href="{{ url_for('student_profile', student_id=lesson_item.student.id) }}" data-spa><h3>{{ lesson_item.student.name }}</h3></a><a href="{{ url_for('lesson', lesson_id=lesson_item.id) }}" data-spa><p>{{ lesson_item.subject }} · {{ lesson_item.student.grade }}</p>{% if lesson_item.is_next %}<span class="dashboard-next-label">Ближайшее</span>{% endif %}</a></div>
       </li>{% endfor %}
     </ol>{% else %}<div class="dashboard-empty"><p>Сегодня занятий нет.</p></div>{% endif %}
   </section>
@@ -50,9 +50,10 @@
   <section class="dashboard-card dashboard-quick" aria-labelledby="quick-title">
     <div class="dashboard-card-heading"><h2 id="quick-title">Быстрые действия</h2></div>
     <div class="dashboard-actions">
-      {% for symbol, label, modal in [('plus', 'Создать занятие', 'lesson'), ('assignment', 'Выдать задание', 'assignment'), ('user-plus', 'Добавить ученика', 'student'), ('upload', 'Загрузить материал', 'material')] %}
+      {% for symbol, label, modal in [('plus', 'Создать занятие', 'lesson'), ('assignment', 'Выдать задание', 'assignment'), ('user-plus', 'Добавить ученика', 'student')] %}
       <button type="button" class="dashboard-action" {% if modal == 'assignment' %}data-homework-open{% else %}data-open-modal="{{ modal }}"{% endif %}>{{ icon(symbol) }}<span>{{ label }}</span></button>
       {% endfor %}
+      <a class="dashboard-action" href="{{ url_for('materials') }}" data-spa>{{ icon('folder') }}<span>Материалы</span></a>
     </div>
   </section>
 </div>

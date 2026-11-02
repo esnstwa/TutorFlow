@@ -25,7 +25,7 @@
       </select>
     </label>
     <button class="dashboard-primary" type="submit">Найти</button>
-    {% if directory_query or directory_subject %}<a class="dashboard-secondary" href="{{ url_for('students') }}" data-spa>Сбросить</a>{% endif %}
+    {% if directory_query or directory_subject %}<a class="dashboard-secondary" href="{{ url_for('students') }}?archived={{ directory_archived }}" data-spa>Сбросить</a>{% endif %}
   </form>
   <p class="student-directory-count" role="status">Показано {{ directory_students|length }} из {{ directory_total }}</p>
   {% endif %}

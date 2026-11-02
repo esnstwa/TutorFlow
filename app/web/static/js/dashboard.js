@@ -6,7 +6,8 @@
       destination: "/schedule",
       fields: [
         ["student_id", "Ученик", "student"], ["topic", "Тема занятия", "text"],
-        ["date", "Дата", "date"], ["start", "Начало", "time"], ["end", "Окончание", "time"],
+        ["date", "Дата (Москва)", "date"], ["start", "Начало", "time"],
+        ["end_date", "Дата окончания (если на другой день)", "date"], ["end", "Окончание", "time"],
       ],
     },
     assignment: {
@@ -21,15 +22,14 @@
       destination: "/students",
       fields: [["name", "Имя и фамилия", "text"], ["email", "Электронная почта", "email"], ["subject", "Предмет", "text"], ["grade", "Класс", "text"]],
     },
-    material: {
-      title: "Загрузить материал",
-      submit: "Добавить материал",
-      destination: "/materials",
-      fields: [["title", "Название", "text"], ["kind", "Тип материала", "material"]],
-    },
   };
 
   let activeModalKind = null;
+  let modalPending = false;
+  let countdownTimer = null;
+  let historyPosition = history.state?.tutorflowPosition ?? 0;
+  let restoringPosition = null;
+  history.replaceState({ ...history.state, tutorflowPosition: historyPosition }, "", location.href);
 
   const shell = () => document.querySelector("[data-teacher-shell]");
   const getStudents = () => {
@@ -44,7 +44,24 @@
     view.setAttribute("aria-busy", String(loading));
   };
 
-  async function navigate(url, { replace = false } = {}) {
+  function canNavigate() {
+    if (modalPending) return false;
+    const beforeNavigate = new CustomEvent("tutorflow:before-navigate", { cancelable: true });
+    document.dispatchEvent(beforeNavigate);
+    return !beforeNavigate.defaultPrevented;
+  }
+
+  async function navigate(url, { replace = false, traversal = null } = {}) {
+    if (!canNavigate()) {
+      if (traversal !== null && traversal !== historyPosition) {
+        restoringPosition = historyPosition;
+        history.go(historyPosition - traversal);
+      }
+      return;
+    }
+    // An accepted traversal has already moved the browser, even if loading fails.
+    if (traversal !== null) historyPosition = traversal;
+    window.clearInterval(countdownTimer);
     setLoading(true);
     try {
       const response = await fetch(url, { headers: { "X-TutorFlow-Navigation": "partial" } });
@@ -55,7 +72,9 @@
       if (!nextShell) throw new Error("Страница кабинета не найдена");
       shell().replaceWith(document.importNode(nextShell, true));
       document.title = page.title;
-      if (replace) history.replaceState({}, "", url); else history.pushState({}, "", url);
+      historyPosition = traversal ?? (replace ? historyPosition : historyPosition + 1);
+      const state = { ...(replace ? history.state : {}), tutorflowPosition: historyPosition };
+      if (replace) history.replaceState(state, "", url); else history.pushState(state, "", url);
       document.dispatchEvent(new CustomEvent("tutorflow:navigated"));
       window.scrollTo({ top: 0, behavior: "smooth" });
       document.querySelector("[data-dashboard-view] h1, [data-dashboard-view] h2")?.focus?.({ preventScroll: true });
@@ -66,6 +85,41 @@
     } finally { setLoading(false); }
   }
 
+  function initCountdown() {
+    window.clearInterval(countdownTimer);
+    const node = document.querySelector("[data-lesson-countdown]");
+    if (!node) return;
+    const start = Date.parse(node.dataset.startAt);
+    const end = Date.parse(node.dataset.endAt);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+    if (!Number.isFinite(node.clockOffset)) {
+      const serverNow = Date.parse(node.dataset.serverNow);
+      node.clockOffset = Number.isFinite(serverNow) ? serverNow - Date.now() : 0;
+    }
+    const update = () => {
+      const now = Date.now() + node.clockOffset;
+      if (now >= end) {
+        window.clearInterval(countdownTimer);
+        node.textContent = "Занятие завершено";
+        if (!node.refreshing) {
+          node.refreshing = true;
+          navigate(location.href, { replace: true });
+        }
+        return false;
+      }
+      const remaining = start - now;
+      if (remaining <= 0) node.textContent = "Идёт занятие";
+      else if (remaining < 60000) node.textContent = "Менее минуты";
+      else {
+        const totalMinutes = Math.ceil(remaining / 60000);
+        const parts = [[Math.floor(totalMinutes / 1440), "д"], [Math.floor(totalMinutes % 1440 / 60), "ч"], [totalMinutes % 60, "мин"]];
+        node.textContent = "Через " + parts.filter(([value]) => value).map(([value, unit]) => `${value} ${unit}`).join(" ");
+      }
+      return true;
+    };
+    if (update()) countdownTimer = window.setInterval(update, 1000);
+  }
+
   const closeProfileMenu = () => {
     const menu = document.querySelector(".dashboard-profile-dropdown");
     const trigger = document.querySelector("[data-profile-trigger]");
@@ -73,16 +127,18 @@
     trigger?.setAttribute("aria-expanded", "false");
   };
 
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
+
   const fieldMarkup = ([name, label, type]) => {
     if (type === "student") {
-      const options = getStudents().map((student) => `<option value="${student.id}">${student.name}</option>`).join("");
+      const options = getStudents().map((student) => `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)}</option>`).join("");
       return `<label>${label}<select name="${name}" required><option value="">Выберите ученика</option>${options}</select></label>`;
     }
-    if (type === "material") return `<label>${label}<select name="${name}" required><option value="PDF">PDF</option><option value="Презентация">Презентация</option><option value="Ссылка">Ссылка</option></select></label>`;
-    return `<label>${label}<input name="${name}" type="${type}" required></label>`;
+    return `<label>${label}<input name="${name}" type="${type}" ${name === "end_date" || (activeModalKind === "student" && name === "email") ? "" : "required"}></label>`;
   };
 
   function openModal(kind, prefill = {}) {
+    if (modalPending) return;
     const definition = modalDefinitions[kind];
     const modal = document.querySelector("[data-modal]");
     if (!definition || !modal) return;
@@ -101,6 +157,7 @@
   }
 
   function closeModal() {
+    if (modalPending) return;
     const modal = document.querySelector("[data-modal]");
     if (modal?.open) modal.close();
     activeModalKind = null;
@@ -143,24 +200,30 @@
   document.addEventListener("submit", async (event) => {
     if (event.target.matches("[data-modal-form]")) {
       event.preventDefault();
+      if (modalPending || !activeModalKind) return;
       const definition = modalDefinitions[activeModalKind];
       const errorNode = event.target.querySelector("[data-modal-error]");
       const submit = event.target.querySelector("[data-modal-submit]");
       const payload = Object.fromEntries(new FormData(event.target));
+      if (payload.end_date === "") delete payload.end_date;
+      modalPending = true;
       submit.disabled = true;
       submit.textContent = "Сохраняем…";
       errorNode.hidden = true;
       try {
-        const response = await fetch(`/api/mock/${activeModalKind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const endpoint = activeModalKind === "lesson" ? "/api/lessons" : activeModalKind === "student" ? "/api/students" : `/api/mock/${activeModalKind}`;
+        const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить");
+        if (!response.ok || !result.ok) throw new Error(result.error || result.detail || "Не удалось сохранить");
+        modalPending = false;
         closeModal();
         await navigate(definition.destination);
-        showToast("Готово — данные добавлены");
+        showToast(definition.success || "Готово — данные добавлены");
       } catch (error) {
         errorNode.textContent = error.message;
         errorNode.hidden = false;
       } finally {
+        modalPending = false;
         submit.disabled = false;
         submit.textContent = definition.submit;
       }
@@ -169,8 +232,7 @@
     if (event.target.matches("[data-settings-form]")) {
       event.preventDefault();
       const status = event.target.querySelector(".dashboard-inline-status");
-      status.textContent = "Сохранено";
-      window.setTimeout(() => { if (status.isConnected) status.textContent = ""; }, 2200);
+      status.textContent = "Сохранение настроек пока недоступно. Данные не изменены.";
     }
   });
 
@@ -180,7 +242,18 @@
       closeModal();
     }
   });
+  document.addEventListener("cancel", (event) => {
+    if (event.target.matches("[data-modal]") && modalPending) event.preventDefault();
+  }, true);
   document.addEventListener("tutorflow:open-modal", (event) => openModal(event.detail.kind, event.detail.prefill));
-  window.addEventListener("popstate", () => navigate(location.href, { replace: true }));
+  document.addEventListener("tutorflow:navigated", initCountdown);
+  window.addEventListener("popstate", (event) => {
+    const position = event.state?.tutorflowPosition ?? 0;
+    // A cancelled traversal is undone with history.go, not a rewritten URL.
+    if (restoringPosition === position) { restoringPosition = null; return; }
+    navigate(location.href, { replace: true, traversal: position });
+  });
+  window.addEventListener("pageshow", initCountdown);
   window.TutorFlow = { navigate, openModal, showToast };
+  initCountdown();
 })();

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     dev_student_email: str = "student@tutorflow.local"
     enable_dev_teacher_fallback: bool = False
     file_storage_path: str = "var/uploads"
+    file_upload_max_bytes: int = Field(default=20 * 1024 * 1024, gt=0, le=20 * 1024 * 1024)
     session_lifetime_seconds: int = Field(
         default=43200,
         gt=0,
@@ -40,6 +41,7 @@ class Settings(BaseSettings):
             "upper bound keeps datetime expiry calculations representable."
         ),
     )
+
 
     @property
     def session_cookie_secure(self) -> bool:

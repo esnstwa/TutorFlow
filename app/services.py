@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
+from math import ceil
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -8,6 +9,8 @@ from urllib.parse import urlparse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
+from app.materials import file_metadata
 from app.homework.schemas import HomeworkCreate
 from app.homework.service import (
     homework_dict,
@@ -35,7 +38,10 @@ MONTHS = ("", "января", "февраля", "марта", "апреля", "�
 
 
 def local_datetime(date_value: str, time_value: str) -> datetime:
-    return datetime.combine(date.fromisoformat(date_value), time.fromisoformat(time_value), tzinfo=MOSCOW)
+    clock = time.fromisoformat(time_value)
+    if clock.tzinfo is not None:
+        raise ValueError("Укажите местное время Europe/Moscow без смещения")
+    return datetime.combine(date.fromisoformat(date_value), clock, tzinfo=MOSCOW)
 
 
 def date_label(value: datetime) -> str:
@@ -96,7 +102,20 @@ def student_directory(db: Session, teacher: User, query: str = "", subject: str 
 
 
 def file_dict(item: FileResource) -> dict[str, Any]:
+    lessons = [
+        {"id": lesson.id, "topic": lesson.topic, "date": date_label(lesson.start_at),
+         "student_name": student_dict(lesson.student)["name"], "url": f"/lessons/{lesson.id}"}
+        for lesson in item.lessons if lesson.teacher_id == item.owner_id
+    ]
+    homeworks = [
+        {"id": homework.id, "title": homework.title, "url": f"/assignments/{homework.id}"}
+        for homework in item.homeworks if homework.teacher_id == item.owner_id
+    ]
     return {
+        **file_metadata(item),
+        "lessons": lessons,
+        "homeworks": homeworks,
+        "availability": "shared" if lessons or any(homework.recipients for homework in item.homeworks if homework.teacher_id == item.owner_id) else "private",
         "id": item.id,
         "title": item.title,
         "kind": item.kind,
@@ -124,6 +143,9 @@ def lesson_dict(lesson: Lesson, *, next_id: int | None = None) -> dict[str, Any]
         "topic": lesson.topic,
         "date": date_label(start),
         "date_iso": start.date().isoformat(),
+        "end_date_iso": end.date().isoformat(),
+        "start_at": start.isoformat(),
+        "end_at": end.isoformat(),
         "start": start.strftime("%H:%M"),
         "end": end.strftime("%H:%M"),
         "is_next": lesson.id == next_id,
@@ -165,7 +187,7 @@ def teacher_dict(teacher: User) -> dict[str, Any]:
         "first_name": teacher.first_name,
         "last_name": teacher.last_name,
         "initials": initials(teacher.first_name, teacher.last_name),
-        "subject": "Математика",
+        "subject": "",
         "email": teacher.email,
         "avatar": teacher.avatar,
     }
@@ -216,14 +238,30 @@ def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
         selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.student),
         selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.submissions),
         selectinload(Lesson.homeworks).selectinload(Homework.recipients).selectinload(HomeworkRecipient.reviews),
-    ).where(Lesson.teacher_id == teacher.id).order_by(Lesson.start_at)))
+    ).where(Lesson.teacher_id == teacher.id).order_by(Lesson.start_at, Lesson.id)))
     assignments = teacher_homeworks(db, teacher.id)
     materials = list(db.scalars(select(FileResource).where(FileResource.owner_id == teacher.id).order_by(FileResource.id)))
     now = datetime.now(timezone.utc)
-    next_lesson = next((item for item in lessons if item.start_at.replace(tzinfo=item.start_at.tzinfo or timezone.utc) >= now and item.status == "scheduled"), lessons[0] if lessons else None)
+    next_lesson = next((item for item in lessons if item.status == "scheduled" and localize(item.end_at) > now), None)
     lesson_rows = [lesson_dict(item, next_id=next_lesson.id if next_lesson else None) for item in lessons]
+    next_row = next((item for item in lesson_rows if item["is_next"]), None)
+    if next_row is not None and next_lesson is not None:
+        start, end = localize(next_lesson.start_at), localize(next_lesson.end_at)
+        seconds = (start - now).total_seconds()
+        if seconds <= 0:
+            countdown = "Идёт занятие"
+        elif seconds < 60:
+            countdown = "Менее минуты"
+        else:
+            days, minutes = divmod(ceil(seconds / 60), 1440)
+            hours, minutes = divmod(minutes, 60)
+            parts = [f"{value} {unit}" for value, unit in ((days, "д"), (hours, "ч"), (minutes, "мин")) if value]
+            countdown = "Через " + " ".join(parts)
+        next_row.update(start_at=start.isoformat(), end_at=end.isoformat(),
+                        date_full=f"{next_row['date']} {start.year}", countdown=countdown,
+                        server_now=now.isoformat())
     assignment_rows = [assignment_dict(item) for item in assignments]
-    today = datetime.now(MOSCOW).date()
+    today = now.astimezone(MOSCOW).date()
     notifications = notification_rows(db, teacher.id)
     return {
         "teacher": teacher_dict(teacher),
@@ -232,10 +270,13 @@ def cabinet_data(db: Session, teacher: User) -> dict[str, Any]:
         "today_lessons": [item for item in lesson_rows if item["date_iso"] == today.isoformat()],
         "assignments": assignment_rows,
         "materials": [file_dict(item) for item in materials],
+        "material_lessons": [{"id": item["id"], "title": f'{item["date"]} {item["start"]} · {item["student"]["name"]} · {item["topic"]}'} for item in lesson_rows],
+        "material_homeworks": [{"id": item["id"], "title": item["title"]} for item in assignment_rows],
+        "material_upload_max_bytes": settings.file_upload_max_bytes,
         "notifications": notifications,
-        "next_lesson": next((item for item in lesson_rows if item["is_next"]), lesson_rows[0] if lesson_rows else None),
+        "next_lesson": next_row,
         "calendar_today": today.isoformat(),
-        "calendar_time": datetime.now(MOSCOW).strftime("%H:%M"),
+        "calendar_time": now.astimezone(MOSCOW).strftime("%H:%M"),
     }
 
 
@@ -261,7 +302,7 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
     caller's SQLAlchemy session and the existing lesson serializer. HTTP
     consumers keep their original call and response shape.
     """
-    source = SQLAlchemyCalendarEventSource(db, lesson_dict)
+    source = SQLAlchemyCalendarEventSource(db, lesson_dict, include_overlapping_lessons=True)
     projected = CalendarEventService(source).list_events(
         teacher_id=teacher.id,
         date_from=date_from,
@@ -279,7 +320,7 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
                     "entity_id": event.entity_id,
                     "type": "lessons",
                     "title": student["name"],
-                    "subtitle": f"{student['subject']} · {row['topic']}",
+                    "subtitle": f"{row['subject']} · {row['topic']}",
                     "avatar": student["initials"],
                     "date": event.start_at.date().isoformat(),
                     "start": event.start_at.strftime("%H:%M"),
@@ -294,6 +335,7 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
             events.append(
                 {
                     "id": f"review-{event.entity_id}",
+                    "end_date": event.end_at.date().isoformat(),
                     "type": "reviews",
                     "title": "Проверка задания",
                     "subtitle": "Работа ученика",
@@ -307,6 +349,75 @@ def calendar_events(db: Session, teacher: User, *, date_from: date | None = None
     return events
 
 
+def ensure_lesson_slot(db: Session, teacher_id: int, start_at: datetime, end_at: datetime, *, exclude_id: int | None = None) -> None:
+    if end_at <= start_at:
+        raise ValueError("Окончание занятия должно быть позже начала")
+    statement = select(Lesson.id).where(Lesson.teacher_id == teacher_id, Lesson.start_at < end_at, Lesson.end_at > start_at)
+    if exclude_id is not None:
+        statement = statement.where(Lesson.id != exclude_id)
+    if db.scalar(statement):
+        raise ValueError("Это время уже занято")
+
+
+def lesson_values(db: Session, teacher: User, payload: dict[str, Any], *, item: Lesson | None = None) -> dict[str, Any]:
+    """Validate a complete proposed state before mutating a lesson."""
+    raw_id = payload.get("student_id", item.student_id if item else None)
+    if isinstance(raw_id, bool) or not isinstance(raw_id, (str, int)) or not str(raw_id).isdecimal():
+        raise ValueError("Ученик не найден")
+    if int(raw_id) > 2**63 - 1:
+        raise ValueError("Ученик не найден")
+    student = scoped_student(db, teacher.id, int(raw_id))
+    if student is None or (student.archived_at is not None and (item is None or student.id != item.student_id)):
+        raise ValueError("Ученик не найден")
+
+    def text(field: str, default: str, maximum: int, *, required: bool = False) -> str:
+        value = payload.get(field, default)
+        if not isinstance(value, str):
+            raise ValueError("Поля занятия должны быть строками")
+        value = value.strip() if field != "teacher_note" else value
+        if required and not value:
+            raise ValueError("Укажите тему занятия" if field == "topic" else "Укажите предмет")
+        if len(value) > maximum:
+            raise ValueError("Заметка не должна превышать 500 символов" if field == "teacher_note" else "Поле занятия слишком длинное")
+        return value
+
+    status = payload.get("status", item.status if item else "scheduled")
+    if not isinstance(status, str) or status not in LESSON_STATUSES:
+        raise ValueError("Неизвестный статус занятия")
+    start_date = payload.get("date", localize(item.start_at).date().isoformat() if item else "")
+    start_time = payload.get("start", localize(item.start_at).time().isoformat() if item else "")
+    end_time = payload.get("end", localize(item.end_at).time().isoformat() if item else "")
+    if not all(isinstance(value, str) for value in (start_date, start_time, end_time)):
+        raise ValueError("Некорректная дата или время")
+    start_at = local_datetime(start_date, start_time)
+    day_offset = localize(item.end_at).date() - localize(item.start_at).date() if item else timedelta()
+    end_date = payload.get("end_date", (start_at.date() + day_offset).isoformat())
+    if not isinstance(end_date, str):
+        raise ValueError("Некорректная дата или время")
+    end_at = local_datetime(end_date, end_time)
+    if end_at <= start_at:
+        raise ValueError("Окончание занятия должно быть позже начала")
+    if item is None or start_at != localize(item.start_at) or end_at != localize(item.end_at):
+        ensure_lesson_slot(db, teacher.id, start_at, end_at, exclude_id=item.id if item else None)
+    location = text("location", item.location if item else "", 300)
+    meeting_url = text("meeting_url", item.meeting_url or "" if item else "", 1000) if "meeting_url" in payload else (
+        location if "location" in payload and location.startswith(("http://", "https://")) else item.meeting_url if item and "location" not in payload else None
+    )
+    return {
+        "student_id": student.id, "student": student, "start_at": start_at, "end_at": end_at, "status": status,
+        "subject": text("subject", item.subject if item else student.subject, 120, required=True),
+        "topic": text("topic", item.topic if item else "", 200, required=True), "location": location,
+        "meeting_url": meeting_url or None, "teacher_note": text("teacher_note", item.teacher_note if item else "", 500),
+    }
+
+
+def lesson_material_labels(payload: dict[str, Any]) -> list[str]:
+    labels = payload.get("materials", [])
+    if not isinstance(labels, list) or any(not isinstance(label, str) or len(label) > 200 for label in labels):
+        raise ValueError("Некорректный список материалов")
+    return [label.strip() for label in labels if label.strip()]
+
+
 def create_entity(db: Session, teacher: User, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     if kind == "student":
         from app.students.schemas import validated_fields
@@ -315,31 +426,12 @@ def create_entity(db: Session, teacher: User, kind: str, payload: dict[str, Any]
         db.flush()
         return student_dict(item)
     if kind == "lesson":
-        student = scoped_student(db, teacher.id, int(payload["student_id"]))
-        if not student or student.archived_at is not None:
-            raise ValueError("Ученик не найден")
-        start_at = local_datetime(str(payload["date"]), str(payload["start"]))
-        end_at = local_datetime(str(payload["date"]), str(payload["end"]))
-        if end_at <= start_at:
-            raise ValueError("Окончание занятия должно быть позже начала")
-        collision = db.scalar(select(Lesson.id).where(Lesson.teacher_id == teacher.id, Lesson.start_at < end_at, Lesson.end_at > start_at))
-        if collision:
-            raise ValueError("Это время уже занято")
-        status = str(payload.get("status", "scheduled"))
-        if status not in LESSON_STATUSES:
-            raise ValueError("Неизвестный статус занятия")
-        topic = str(payload.get("topic") or "").strip()
-        if not topic:
-            raise ValueError("Укажите тему занятия")
-        teacher_note = str(payload.get("teacher_note", ""))
-        if len(teacher_note) > 500:
-            raise ValueError("Заметка не должна превышать 500 символов")
-        location = str(payload.get("location", "Онлайн · TutorFlow")).strip()
-        meeting_url = str(payload.get("meeting_url", "")).strip() or None
-        item = Lesson(teacher_id=teacher.id, student_id=student.id, subject=str(payload.get("subject") or student.subject), topic=topic, start_at=start_at, end_at=end_at, location=location, meeting_url=meeting_url, teacher_note=teacher_note, status=status)
+        values = lesson_values(db, teacher, payload)
+        labels = lesson_material_labels(payload)
+        item = Lesson(teacher_id=teacher.id, **values)
         db.add(item)
+        item.materials = [material_from_label(db, teacher, label) for label in labels]
         db.flush()
-        item.student = student
         return lesson_dict(item)
     if kind == "assignment":
         due = datetime.combine(date.fromisoformat(str(payload["due"])), time(23, 59), tzinfo=MOSCOW)
