@@ -251,21 +251,107 @@ def test_foreign_lesson_is_inaccessible_and_cannot_be_mutated(schedule_case, met
     assert not case["foreign"].get("/api/lessons").json()["lessons"]
 
 
-@pytest.mark.parametrize("method,suffix", [("post", ""), ("patch", "/1"), ("delete", "/1"), ("post", "/1/reschedule")])
-def test_session_role_and_csrf_protections_cover_schedule_mutations(schedule_case, method, suffix):
+def lesson_snapshot(sessions):
+    """Read all persisted lesson columns in a fresh session."""
+    table = Lesson.__table__
+    with sessions() as db:
+        return db.execute(select(table).order_by(table.c.id)).all()
+
+
+@pytest.mark.parametrize("route,method", [
+    ("/api/lessons", "POST"),
+    ("/api/mock/lesson", "POST"),
+    ("/api/lessons/{id}", "PATCH"),
+    ("/api/mock/lessons/{id}", "PATCH"),
+    ("/api/lessons/{id}/reschedule", "POST"),
+    ("/api/mock/lessons/{id}/reschedule", "POST"),
+    ("/api/lessons/{id}", "DELETE"),
+    ("/api/mock/lessons/{id}", "DELETE"),
+])
+def test_session_role_and_csrf_protections_cover_schedule_mutations(schedule_case, route, method):
+    case = schedule_case
+    lesson = create(case)
+    path = route.format(id=lesson["id"])
+    client = case["client"]
+    same_origin = {"Origin": str(client.base_url)}
+    if "{id}" not in route:
+        data = {"json": payload(case, start="14:00", end="15:00")}
+    elif route.endswith("/reschedule"):
+        data = {"json": {"date": "2035-01-14", "start": "12:00"}}
+    elif method == "PATCH":
+        data = {"json": {"topic": "Механика"}}
+    else:
+        data = {}
+    before = lesson_snapshot(case["sessions"])
+    valid_token = client.headers.pop("X-CSRF-Token")
+
+    for headers in (
+        same_origin,
+        {**same_origin, "X-CSRF-Token": "invalid-test-token"},
+        {"Origin": "https://other.example", "X-CSRF-Token": valid_token},
+    ):
+        response = client.request(method, path, headers=headers, **data)
+        assert response.status_code == 403
+        assert lesson_snapshot(case["sessions"]) == before
+
+    student = case["student_client"]
+    assert student.request(method, path, headers=same_origin, **data).status_code == 403
+    with TestClient(client.app) as anonymous:
+        assert anonymous.request(method, path, headers=same_origin, **data).status_code == 401
+    assert lesson_snapshot(case["sessions"]) == before
+
+    response = client.request(
+        method, path, headers={**same_origin, "X-CSRF-Token": valid_token}, **data
+    )
+    assert response.status_code == 200
+    assert lesson_snapshot(case["sessions"]) != before
+
+
+@pytest.mark.parametrize("fields", [
+    {"start": "11:00", "end": "10:00"},
+    {"start": "10:00", "end": "10:00"},
+    {"student_id": "foreign_student"},
+    {"student_id": "archived"},
+    {"status": "unknown"},
+    {"topic": "   "},
+    {"teacher_note": "x" * 501},
+], ids=["reversed", "equal", "foreign", "archived", "unknown-status", "blank-topic", "note-501"])
+def test_creation_rejects_invalid_schedule_without_inserting(schedule_case, fields):
     case = schedule_case
     create(case)
-    client = case["client"]
-    csrf = client.headers.pop("X-CSRF-Token")
-    data = {} if method == "delete" else {"json": payload(case)}
-    response = getattr(client, method)(f"/api/lessons{suffix}", **data)
-    assert response.status_code == 403
-    client.headers["X-CSRF-Token"] = csrf
-    response = getattr(case["student_client"], method)(f"/api/lessons{suffix}", **data)
-    assert response.status_code == 403
-    anonymous = TestClient(client.app)
-    response = getattr(anonymous, method)(f"/api/lessons{suffix}", **data)
-    assert response.status_code == 401
+    before = lesson_snapshot(case["sessions"])
+    fields = {key: case[value] if key == "student_id" else value for key, value in fields.items()}
+    response = case["client"].post(
+        "/api/lessons", json=payload(case, date="2035-01-14", **fields)
+    )
+    assert response.status_code == 422
+    assert lesson_snapshot(case["sessions"]) == before
+
+
+def test_created_lesson_with_maximum_note_persists_and_appears_in_calendar(schedule_case):
+    case = schedule_case
+    note = "я" * 500
+    lesson = create(case, teacher_note=note)
+    with case["sessions"]() as db:
+        saved = db.get(Lesson, lesson["id"])
+        assert saved.student_id == case["first"]
+        assert saved.end_at - saved.start_at == timedelta(hours=1)
+        assert (saved.topic, saved.status, saved.teacher_note) == ("Оптика", "scheduled", note)
+
+    assert case["client"].get(f"/api/lessons/{lesson['id']}").json()["lesson"] == lesson
+    page = case["client"].get("/schedule")
+    assert page.status_code == 200
+    embedded = re.search(r'data-calendar-events>(.*?)</script>', page.text, re.S)
+    assert embedded is not None
+    events = json.loads(embedded.group(1))
+    assert [entry["lesson"]["id"] for entry in events if entry["type"] == "lessons"] == [lesson["id"]]
+
+
+def test_schedule_page_redirects_unauthenticated_browser(schedule_case):
+    with TestClient(schedule_case["client"].app) as anonymous:
+        response = anonymous.get("/schedule", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["Location"] == "/login"
 
 
 def test_delete_preserves_assigned_homework_and_its_recipients(schedule_case):
