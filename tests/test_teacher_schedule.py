@@ -255,7 +255,7 @@ def lesson_snapshot(sessions):
     """Read all persisted lesson columns in a fresh session."""
     table = Lesson.__table__
     with sessions() as db:
-        return db.execute(select(table).order_by(table.c.id)).all()
+        return {row["id"]: dict(row) for row in db.execute(select(table)).mappings()}
 
 
 @pytest.mark.parametrize("route,method", [
@@ -304,7 +304,34 @@ def test_session_role_and_csrf_protections_cover_schedule_mutations(schedule_cas
         method, path, headers={**same_origin, "X-CSRF-Token": valid_token}, **data
     )
     assert response.status_code == 200
-    assert lesson_snapshot(case["sessions"]) != before
+    after = lesson_snapshot(case["sessions"])
+    lesson_id = lesson["id"]
+    if "{id}" not in route:
+        added_ids = after.keys() - before.keys()
+        assert len(added_ids) == 1
+        added_id = added_ids.pop()
+        saved = after.pop(added_id)
+        assert after == before
+        assert saved["teacher_id"] == case["teacher_id"]
+        assert saved["student_id"] == case["first"]
+        assert saved["topic"] == "Оптика"
+        assert saved["status"] == "scheduled"
+        assert saved["start_at"] == datetime(2035, 1, 13, 14)
+        assert saved["end_at"] == datetime(2035, 1, 13, 15)
+    elif method == "DELETE":
+        assert after == {key: row for key, row in before.items() if key != lesson_id}
+    else:
+        assert after.keys() == before.keys()
+        for key in before.keys() - {lesson_id}:
+            assert after[key] == before[key]
+        previous = {key: value for key, value in before[lesson_id].items() if key != "updated_at"}
+        current = {key: value for key, value in after[lesson_id].items() if key != "updated_at"}
+        if route.endswith("/reschedule"):
+            duration = previous["end_at"] - previous["start_at"]
+            start_at = datetime(2035, 1, 14, 12)
+            assert current == {**previous, "start_at": start_at, "end_at": start_at + duration}
+        else:
+            assert current == {**previous, "topic": "Механика"}
 
 
 @pytest.mark.parametrize("fields", [
@@ -337,6 +364,8 @@ def test_created_lesson_with_maximum_note_persists_and_appears_in_calendar(sched
         assert saved.student_id == case["first"]
         assert saved.end_at - saved.start_at == timedelta(hours=1)
         assert (saved.topic, saved.status, saved.teacher_note) == ("Оптика", "scheduled", note)
+        assert saved.location == ""
+        assert saved.meeting_url is None
 
     assert case["client"].get(f"/api/lessons/{lesson['id']}").json()["lesson"] == lesson
     page = case["client"].get("/schedule")
